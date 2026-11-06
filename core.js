@@ -19,7 +19,7 @@
  */
 (function () {
   'use strict';
-  const VERSION = '1.0.0';              // súbala junto con VERSION en sw.js cada vez que publique cambios
+  const VERSION = '1.0.1';              // súbala junto con VERSION en sw.js cada vez que publique cambios
   const API_URL = String(window.API_URL || '').trim();
   const DEMO = !API_URL;
   const K = { ses: 'mv_sesion', mod: 'mv_modulo', tema: 'mv_tema', tip: 'mv_tip_instalar' };
@@ -123,7 +123,7 @@
       <label class="mv-campo"><span>Usuario o correo</span><input class="mv-input" id="mvU" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" value="${esc(ult)}" placeholder="Ej.: despana" required></label>
       <label class="mv-campo"><span>Contraseña</span><div class="mv-clave"><input class="mv-input" id="mvP" name="password" type="password" autocomplete="current-password" required><button type="button" id="mvVer" aria-label="Mostrar contraseña" title="Mostrar contraseña">${I.ojo}</button></div></label>
       <button class="mv-btn primario ancho" id="mvEntrar" type="submit">Ingresar</button>
-      <p class="pie">Use el mismo usuario y contraseña del Estudio de precios.<br>¿Problemas para entrar? Escriba a Diego España.</p>
+      <p class="pie">Si tiene usuario en Duracreto 360, use esa misma contraseña.<br>¿Problemas para entrar? Escriba a Diego España.</p>
     </form></main>`;
     const f = $('#mvLogin'), u = $('#mvU'), p = $('#mvP');
     (ult ? p : u).focus();
