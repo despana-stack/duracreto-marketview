@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12130F">
+<meta name="description" content="Inteligencia de mercado y ventas de Duracreto.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="MarketView">
+<title>Duracreto MarketView</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="core.css">
+<script>try{var t=localStorage.getItem('mv_tema');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body>
+<!-- Cascarón de Duracreto MarketView (chat Núcleo). Los módulos se cargan desde su carpeta: mapa/, proyectos/, precios/, dashboard/. -->
+<div id="app" aria-live="polite"><div class="mv-carga"><img src="icons/icon-192.png" alt="" width="72" height="72"><p>Cargando MarketView…</p></div></div>
+<div id="mv-toast" class="mv-toast" role="status" hidden></div>
+<script src="config.js"></script>
+<script src="core.js"></script>
+</body>
+</html>
