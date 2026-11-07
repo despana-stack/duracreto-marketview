@@ -1,1 +1,165 @@
-/* Estilos del módulo dashboard. Usar siempre el prefijo .dashboard- para no chocar con otros módulos. */
+/* Duracreto MarketView — «Dashboard en obra» (marcador animado; lo reemplaza el dashboard real en la etapa 5).
+   Todo con prefijo .dash- y dentro de .dash-raiz. */
+.dash-raiz{--dash-cuerpo:#3A3B34;--dash-tenue:#DCDCD5;--dash-linea:var(--line);
+  position:relative;min-height:100%;padding:0 16px 0;overflow-x:hidden;
+  background:linear-gradient(180deg,var(--surface2) 0%,var(--bg) 46%);color:var(--fg)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .dash-raiz{--dash-cuerpo:#9C9D95;--dash-tenue:#2E2F29}}
+:root[data-theme="dark"] .dash-raiz{--dash-cuerpo:#9C9D95;--dash-tenue:#2E2F29}
+
+/* ---------- Cielo: grúa y cartel ---------- */
+.dash-cielo{position:relative;z-index:6;height:150px;max-width:1180px;margin:0 auto;pointer-events:none}
+.dash-grua{position:absolute;right:0;top:6px;width:min(420px,70%);height:auto;overflow:visible}
+.dash-carro{animation:dash-carro 12s ease-in-out infinite}
+@keyframes dash-carro{0%,100%{transform:translateX(150px)}45%,55%{transform:translateX(360px)}}
+.dash-cable{transform-box:fill-box;transform-origin:50% 0;animation:dash-vaiven 3s ease-in-out infinite}
+@keyframes dash-vaiven{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+.dash-cartel{position:absolute;left:0;bottom:14px;background:var(--ink);color:var(--yellow);border:3px solid var(--yellow);border-radius:6px;padding:8px 14px;font-weight:800;font-size:15px;letter-spacing:.3px;transform:rotate(-2deg);box-shadow:0 6px 0 rgba(0,0,0,.15)}
+.dash-cartel b{color:#F2F2EE;margin-right:4px}
+.dash-cartel small{display:block;font-weight:600;font-size:11.5px;color:#BDBEB6;letter-spacing:0}
+
+/* ---------- Edificio: cada ventana es una bandeja ---------- */
+.dash-edif{position:relative;max-width:1180px;margin:0 auto;padding:18px;border-radius:14px 14px 0 0;
+  background:repeating-linear-gradient(0deg,transparent 0 46px,color-mix(in srgb,var(--dash-linea) 55%,transparent) 46px 47px),var(--surface2);
+  border:2px solid var(--dash-linea);border-bottom:0;
+  display:grid;gap:16px;grid-template-columns:repeat(4,minmax(0,1fr));
+  grid-template-areas:"k1 k2 k3 k4" "an an an al" "me me pu al"}
+.dash-v{position:relative;overflow:hidden;min-height:132px;padding:14px 14px 12px;border-radius:12px;
+  background:color-mix(in srgb,var(--surface) 82%,transparent);border:2px dashed var(--dash-linea)}
+.dash-v h3{margin:0 0 8px;font-size:12.5px;font-weight:600;color:var(--muted);opacity:.85}
+.dash-v:nth-of-type(1){grid-area:k1}.dash-v:nth-of-type(2){grid-area:k2}.dash-v:nth-of-type(3){grid-area:k3}.dash-v:nth-of-type(4){grid-area:k4}
+.dash-v:nth-of-type(5){grid-area:an;min-height:280px}.dash-v:nth-of-type(6){grid-area:al}
+.dash-v:nth-of-type(7){grid-area:me;min-height:210px}.dash-v:nth-of-type(8){grid-area:pu}
+.dash-cifra{margin:0;font-size:26px;font-weight:800;letter-spacing:1px;color:var(--fg);opacity:.22}
+.dash-nota{position:relative;z-index:3;margin:8px 0 0;font-size:12px;font-weight:600;color:var(--accent-ink)}
+.dash-brillo{position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,color-mix(in srgb,var(--yellow) 22%,transparent) 50%,transparent 70%);transform:translateX(-100%);animation:dash-brillo 3.2s ease-in-out infinite}
+@keyframes dash-brillo{60%,100%{transform:translateX(100%)}}
+
+/* KPI con X de cinta */
+.dash-x::before,.dash-x::after{content:"";position:absolute;left:-10%;right:-10%;top:50%;height:16px;
+  background:repeating-linear-gradient(-45deg,var(--yellow) 0 12px,var(--ink) 12px 24px);opacity:.85;transform:rotate(18deg)}
+.dash-x::after{transform:rotate(-18deg)}
+
+/* Andamio */
+.dash-andamio{position:absolute;right:10px;top:10px;bottom:0;width:70px;opacity:.9;
+  border-left:4px solid #8F9088;border-right:4px solid #8F9088;
+  background:repeating-linear-gradient(0deg,transparent 0 30px,#8F9088 30px 34px)}
+.dash-andamio i{position:absolute;left:0;right:0;height:2px;background:#8F9088;transform-origin:left}
+.dash-andamio i:nth-child(1){top:20%;transform:rotate(40deg);width:120%}
+.dash-andamio i:nth-child(2){top:50%;transform:rotate(-40deg);width:120%;left:0}
+.dash-andamio i:nth-child(3){top:80%;transform:rotate(40deg);width:120%}
+
+/* Trabajadores */
+.dash-obrero{position:absolute;width:44px;height:58px;z-index:2;overflow:visible}
+.dash-obrero .dash-brazo{transform-box:fill-box}
+.dash-pinta{right:14px;bottom:6px}
+.dash-rodilla{transform-origin:0% 100%;animation:dash-rodillo 1.6s ease-in-out infinite}
+@keyframes dash-rodillo{0%,100%{transform:rotate(0)}50%{transform:rotate(-28deg)}}
+.dash-martillo{right:22px;top:24px}
+.dash-martilla{transform-origin:0% 100%;animation:dash-golpe .7s ease-in infinite}
+@keyframes dash-golpe{0%,100%{transform:rotate(-35deg)}55%{transform:rotate(18deg)}}
+.dash-chispa{position:absolute;right:16px;top:30px;width:8px;height:8px;border-radius:50%;background:var(--yellow);box-shadow:0 0 10px 3px var(--yellow);animation:dash-chispa .7s steps(1) infinite;z-index:3}
+@keyframes dash-chispa{0%,50%{opacity:0}55%,70%{opacity:1}}
+.dash-sube{right:34px;bottom:0;animation:dash-sube 7s ease-in-out infinite}
+@keyframes dash-sube{0%,100%{transform:translateY(0)}45%,55%{transform:translateY(-150px)}}
+.dash-sube .dash-pi{animation:dash-pierna .5s ease-in-out infinite alternate}
+.dash-cafe{position:relative;width:38px;height:50px}
+.dash-sorbo{transform-origin:0% 100%;animation:dash-sorbo 4s ease-in-out infinite}
+@keyframes dash-sorbo{0%,60%,100%{transform:rotate(0)}70%,85%{transform:rotate(-22deg)}}
+.dash-vapor{animation:dash-vapor 2s ease-in-out infinite}
+@keyframes dash-vapor{0%{opacity:0;transform:translateY(2px)}50%{opacity:.9}100%{opacity:0;transform:translateY(-3px)}}
+
+/* Barras (al fondo, tenues) */
+.dash-barras{position:absolute;left:14px;right:96px;bottom:46px;top:44px;display:flex;align-items:flex-end;gap:3%;opacity:.4}
+.dash-grupo{flex:1;height:100%;display:flex;align-items:flex-end;gap:2px}
+.dash-grupo b{flex:1;height:var(--h);border-radius:3px 3px 0 0;background:var(--yellow);transform-origin:bottom;animation:dash-crece 4.5s ease-in-out infinite;animation-delay:var(--d)}
+.dash-grupo b.p{background:var(--brandgray)}
+.dash-grupo b.q{background:var(--orange)}
+@keyframes dash-crece{0%,100%{transform:scaleY(.2)}40%,70%{transform:scaleY(1)}}
+.dash-leyenda{position:absolute;left:14px;bottom:14px;display:flex;gap:14px;font-size:11.5px;color:var(--muted);opacity:.8}
+.dash-leyenda span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:var(--yellow)}
+.dash-leyenda .p::before{background:var(--brandgray)}.dash-leyenda .q::before{background:var(--orange)}
+.dash-letrero{position:absolute;right:112px;top:12px;z-index:3;background:var(--yellow);color:var(--ink);font-weight:800;font-size:11.5px;padding:5px 10px;border-radius:4px;border:2px solid var(--ink);transform:rotate(3deg)}
+
+/* Dona */
+.dash-dona{width:74px;height:74px;opacity:.6;animation:dash-gira 8s linear infinite}
+@keyframes dash-gira{to{transform:rotate(360deg)}}
+
+/* Ranking: bloque por bloque */
+.dash-filas{display:flex;flex-direction:column;gap:9px;margin-top:6px}
+.dash-fila{display:flex;align-items:center;gap:8px;opacity:0;animation:dash-ladrillo 6.5s ease-out infinite;animation-delay:var(--d)}
+.dash-fila span:first-child{width:22px;height:22px;border-radius:50%;background:var(--dash-tenue)}
+.dash-fila span:last-child{height:12px;border-radius:3px;background:repeating-linear-gradient(90deg,var(--orange) 0 26px,color-mix(in srgb,var(--orange) 60%,var(--surface)) 26px 28px);opacity:.55}
+@keyframes dash-ladrillo{0%{opacity:0;transform:translateY(-14px)}8%,80%{opacity:1;transform:none}92%,100%{opacity:0}}
+
+/* Tendencia y mixer */
+.dash-linea{position:absolute;left:14px;right:14px;top:42px;height:calc(100% - 92px);opacity:.6}
+.dash-guia{stroke:var(--dash-tenue);stroke-width:1;fill:none}
+.dash-trazo{fill:none;stroke:var(--orange);stroke-width:3;stroke-linecap:round;stroke-dasharray:420;stroke-dashoffset:420;animation:dash-traza 6s ease-in-out infinite;vector-effect:non-scaling-stroke}
+.dash-trazo.b{stroke:var(--brandgray);stroke-dasharray:6 6;animation:none;stroke-dashoffset:0;opacity:.8}
+@keyframes dash-traza{0%{stroke-dashoffset:420}55%,85%{stroke-dashoffset:0}100%{stroke-dashoffset:-420}}
+.dash-media .dash-nota{position:absolute;left:14px;bottom:12px;margin:0}
+.dash-mixer{position:absolute;right:14px;bottom:8px;width:110px;z-index:2;animation:dash-motor .35s ease-in-out infinite alternate}
+@keyframes dash-motor{to{transform:translateY(-1px)}}
+.dash-tambor{transform-box:fill-box;transform-origin:center;animation:dash-gira 3s linear infinite}
+
+/* Puerta */
+.dash-puerta{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;text-align:center}
+.dash-marco{width:86px;height:118px;border:5px solid var(--dash-cuerpo);border-bottom:0;border-radius:6px 6px 0 0;perspective:300px;background:var(--ink)}
+.dash-hoja{position:relative;width:100%;height:100%;background:var(--brandgray);transform-origin:left;animation:dash-puerta 5s ease-in-out infinite}
+.dash-manija{position:absolute;right:8px;top:55%;width:7px;height:7px;border-radius:50%;background:var(--yellow)}
+@keyframes dash-puerta{0%,40%,100%{transform:rotateY(0)}55%,80%{transform:rotateY(-38deg)}}
+.dash-puerta p{margin:10px 0 0;font-size:12px;color:var(--muted)}
+.dash-puerta p b{color:var(--fg)}
+
+/* Cintas de peligro */
+.dash-cinta{position:absolute;left:-4%;right:-4%;z-index:5;pointer-events:none;height:26px;display:flex;align-items:center;overflow:hidden;white-space:nowrap;
+  background:var(--yellow);border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);color:var(--ink);font-weight:800;font-size:12px;letter-spacing:2px;box-shadow:0 4px 10px rgba(0,0,0,.18)}
+.dash-cinta span{padding-left:20px}
+.dash-cinta-1{top:44%;transform:rotate(-3deg)}
+.dash-cinta-2{bottom:12%;transform:rotate(2.5deg);background:repeating-linear-gradient(-45deg,var(--yellow) 0 18px,#FFE45C 18px 36px)}
+.dash-cinta-x{top:34%;left:-20%;right:-20%;transform:rotate(-24deg);height:20px;font-size:10px}
+
+/* Suelo */
+.dash-suelo{position:relative;max-width:1180px;margin:0 auto;height:76px;display:flex;align-items:flex-end;gap:14px;padding:0 18px 8px;
+  border-top:6px solid var(--dash-cuerpo);background:repeating-linear-gradient(90deg,var(--surface2) 0 40px,var(--dash-tenue) 40px 42px)}
+.dash-cono{width:20px;height:24px;flex:none}
+.dash-paseo{position:absolute;left:0;bottom:6px;display:flex;align-items:flex-end;animation:dash-paseo 16s linear infinite}
+@keyframes dash-paseo{from{transform:translateX(-90px)}to{transform:translateX(calc(min(1180px,100vw) + 20px))}}
+.dash-camina{position:relative;width:38px;height:50px}
+.dash-camina .dash-pi{transform-box:fill-box;transform-origin:50% 0;animation:dash-pierna .45s ease-in-out infinite alternate}
+.dash-camina .dash-pd{transform-box:fill-box;transform-origin:50% 0;animation:dash-pierna .45s ease-in-out infinite alternate-reverse}
+@keyframes dash-pierna{from{transform:rotate(-14deg)}to{transform:rotate(14deg)}}
+.dash-carretilla{width:50px;height:30px;margin-left:-4px}
+.dash-rueda{transform-box:fill-box;transform-origin:center;animation:dash-gira 1s linear infinite;stroke-dasharray:6 3}
+.dash-descanso{margin-left:auto;display:flex;align-items:flex-end;gap:8px;font-size:11.5px;color:var(--muted)}
+.dash-descanso span{background:var(--surface);border:1px solid var(--dash-linea);border-radius:10px 10px 10px 2px;padding:5px 9px;margin-bottom:34px}
+
+/* Cinta de avisos */
+.dash-ticker{max-width:1180px;margin:0 auto;overflow:hidden;background:var(--ink);color:var(--yellow);font-weight:700;font-size:13px;height:34px;display:flex;align-items:center;border-radius:0 0 10px 10px}
+.dash-ticker-in{display:flex;gap:18px;white-space:nowrap;animation:dash-ticker 60s linear infinite;padding-left:18px}
+.dash-sep{color:var(--orange)}
+@keyframes dash-ticker{to{transform:translateX(-50%)}}
+.dash-pie{max-width:1180px;margin:12px auto 24px;text-align:center;font-size:12px;color:var(--muted)}
+
+/* ---------- Celular ---------- */
+@media (max-width:760px){
+  .dash-raiz{padding:0 10px}
+  .dash-cielo{height:124px}
+  .dash-grua{width:78%}
+  .dash-cartel{font-size:13px;bottom:8px}
+  .dash-edif{padding:12px;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"k1 k2" "k3 k4" "an an" "al al" "me me" "pu pu"}
+  .dash-v{min-height:112px;padding:12px}
+  .dash-cifra{font-size:20px}
+  .dash-v:nth-of-type(5){min-height:240px}
+  .dash-v:nth-of-type(8){min-height:190px}
+  .dash-letrero{right:96px}
+  .dash-descanso span{display:none}
+}
+
+/* ---------- Sin animaciones si la persona lo pidió en su sistema ---------- */
+@media (prefers-reduced-motion: reduce){
+  .dash-raiz *{animation:none!important}
+  .dash-fila{opacity:1}
+  .dash-trazo{stroke-dashoffset:0}
+  .dash-paseo{transform:translateX(40vw)}
+}

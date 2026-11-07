@@ -9,7 +9,7 @@
   --font:'Poppins',ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --r:14px; --sombra:0 1px 2px rgba(18,19,15,.06),0 6px 20px rgba(18,19,15,.06);
   --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
-  --top-h:calc(56px + var(--safe-t)); --nav-h:calc(64px + var(--safe-b)); --side-w:248px;
+  --top-h:calc(56px + var(--safe-t)); --nav-h:calc(64px + var(--safe-b));
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
@@ -69,18 +69,17 @@ img{max-width:100%}
 .mv-giro{width:18px;height:18px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;animation:mv-giro .7s linear infinite;display:inline-block}
 @keyframes mv-giro{to{transform:rotate(360deg)}}
 
-/* ---------- Encabezado ---------- */
+/* ---------- Encabezado (en computadora lleva también el menú de módulos) ---------- */
 .mv-top{position:fixed;top:0;left:0;right:0;height:var(--top-h);padding:var(--safe-t) 10px 0 14px;background:var(--ink);color:#F2F2EE;display:flex;align-items:center;gap:12px;z-index:40}
 .mv-marca{display:flex;align-items:center;gap:10px;min-width:0;flex:1;text-decoration:none;color:inherit}
-.mv-marca img{width:34px;height:34px;border-radius:9px;flex:none}
-.mv-marca div{min-width:0;line-height:1.15}
-.mv-marca small{display:block;font-size:11px;color:#BDBEB6;letter-spacing:.3px}
-.mv-marca b{display:block;font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mv-marca img{width:32px;height:32px;border-radius:8px;flex:none}
+.mv-marca b{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.mv-marca-app{display:none}
 .mv-top-acc{display:flex;align-items:center;gap:6px}
-.mv-yo{width:40px;height:40px;border-radius:50%;border:2px solid #3A3B34;background:var(--yellow);color:var(--ink);font-weight:800;font-size:14px;display:grid;place-items:center;padding:0}
+.mv-yo{width:38px;height:38px;border-radius:50%;border:2px solid #3A3B34;background:var(--yellow);color:var(--ink);font-weight:800;font-size:13.5px;display:grid;place-items:center;padding:0}
 .mv-yo:hover{border-color:var(--orange)}
 
-/* ---------- Navegación: barra inferior (celular) / lateral (computadora) ---------- */
+/* ---------- Menú de módulos: barra inferior (celular) ---------- */
 .mv-nav{position:fixed;left:0;right:0;bottom:0;height:var(--nav-h);padding-bottom:var(--safe-b);background:var(--surface);border-top:1px solid var(--line);display:flex;z-index:40}
 .mv-nav button{flex:1;border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted);font-size:11px;font-weight:600;padding:6px 2px;min-width:0}
 .mv-nav button span.ic{display:grid;place-items:center;width:52px;height:28px;border-radius:14px;transition:background .15s}
@@ -88,22 +87,32 @@ img{max-width:100%}
 .mv-nav button[aria-current="page"]{color:var(--fg)}
 .mv-nav button[aria-current="page"] span.ic{background:var(--yellow);color:var(--ink)}
 .mv-nav button em{font-style:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.mv-nav-pie{display:none}
 
 #mv-main{position:fixed;top:var(--top-h);left:0;right:0;bottom:var(--nav-h)}
 #mv-main.sin-nav{bottom:0}
 .mv-mod{position:absolute;inset:0;overflow:auto;-webkit-overflow-scrolling:touch}
 .mv-mod.relleno{padding:16px}
 
+/* ---------- Computadora: menú dentro del encabezado, sin barra lateral (todo el ancho para el módulo) ---------- */
 @media (min-width:1024px){
-  .mv-nav{top:var(--top-h);bottom:0;right:auto;width:var(--side-w);height:auto;flex-direction:column;justify-content:flex-start;gap:4px;padding:14px 12px;border-top:0;border-right:1px solid var(--line)}
-  .mv-nav button{flex:none;flex-direction:row;justify-content:flex-start;gap:12px;height:46px;padding:0 12px;border-radius:12px;font-size:14px;font-weight:500;color:var(--fg)}
+  .mv-marca{flex:none}
+  .mv-marca-app{display:inline}
+  .mv-marca-mod{display:none}
+  .mv-nav{position:static;height:auto;padding:0;background:none;border:0;flex:1;justify-content:center;gap:4px;z-index:auto;min-width:0}
+  .mv-nav button{flex:none;flex-direction:row;gap:8px;height:38px;padding:0 14px;border-radius:19px;font-size:13.5px;font-weight:500;color:#BDBEB6}
   .mv-nav button span.ic{width:auto;height:auto;background:none!important;color:inherit}
-  .mv-nav button:hover{background:var(--surface2)}
+  .mv-nav button svg{width:18px;height:18px}
+  .mv-nav button:hover{background:#24251F;color:#F2F2EE}
   .mv-nav button[aria-current="page"]{background:var(--yellow);color:var(--ink);font-weight:700}
-  .mv-nav-pie{display:block;margin-top:auto;font-size:11.5px;color:var(--muted);padding:8px 12px}
-  #mv-main{left:var(--side-w);bottom:0}
+  .mv-top-acc{flex:none;min-width:115px;justify-content:flex-end}      /* equilibra la marca para que el menú quede centrado */
+  #mv-main,#mv-main.sin-nav{bottom:0}
   .mv-mod.relleno{padding:24px}
+}
+
+/* ---------- App instalada en computadora sin barra de título (Window Controls Overlay) ---------- */
+@media (display-mode: window-controls-overlay){
+  .mv-top{padding-left:max(14px, env(titlebar-area-x, 0px));padding-right:max(10px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)));app-region:drag;-webkit-app-region:drag}
+  .mv-top a,.mv-top button{app-region:no-drag;-webkit-app-region:no-drag}
 }
 
 /* ---------- Menú de usuario ---------- */
@@ -139,7 +148,7 @@ img{max-width:100%}
 .mv-toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--nav-h) + 14px);z-index:70;background:var(--ink);color:#F2F2EE;border-radius:12px;padding:11px 16px;font-size:13.5px;max-width:min(460px,calc(100% - 32px));box-shadow:0 8px 24px rgba(0,0,0,.3);display:flex;gap:12px;align-items:center}
 .mv-toast.error{background:var(--bad)}
 .mv-toast button{border:0;background:var(--yellow);color:var(--ink);border-radius:8px;padding:5px 10px;font-weight:700;font-size:12.5px}
-@media (min-width:1024px){.mv-toast{bottom:20px;left:calc(50% + var(--side-w)/2)}}
+@media (min-width:1024px){.mv-toast{bottom:20px}}
 .mv-tip{position:fixed;left:12px;right:12px;bottom:calc(var(--nav-h) + 12px);z-index:45;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:var(--sombra);display:flex;gap:12px;align-items:center;font-size:13px}
 .mv-tip img{width:40px;height:40px;border-radius:10px;flex:none}
 .mv-tip .x{border:0;background:none;color:var(--muted);font-size:20px;padding:4px 6px;margin-left:auto}

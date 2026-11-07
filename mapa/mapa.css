@@ -2,7 +2,7 @@
    Todo va dentro de .mapa-raiz para no chocar con otros módulos. Usa las variables de core.css. */
 .mapa-raiz{
   --mapa-ganado:#1E9E57; --mapa-perspectiva:#E8AE00; --mapa-competencia:#D93025; --mapa-perdido:#6B6B68; --mapa-sinestado:#A0A19F;
-  --mapa-panel-w:330px; --mapa-r:10px; --mapa-halo:#fff;
+  --mapa-panel-w:330px; --mapa-panel-ocupa:var(--mapa-panel-w); --mapa-r:10px; --mapa-halo:#fff;
   position:absolute;inset:0;display:flex;min-height:0;overflow:hidden;font-size:13px;line-height:1.45;color:var(--fg);background:var(--bg)
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .mapa-raiz{--mapa-ganado:#3CC47A;--mapa-perspectiva:#F5C518;--mapa-competencia:#FF6B5E;--mapa-perdido:#8E8E89;--mapa-sinestado:#6E6E6A;--mapa-halo:#000}}
@@ -29,7 +29,7 @@
 .mapa-raiz input:focus-visible,.mapa-raiz select:focus-visible,.mapa-raiz .btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 
 /* Panel + mapa */
-#mapa-panel{width:var(--mapa-panel-w);flex:none;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;z-index:900}
+#mapa-panel{width:var(--mapa-panel-w);flex:none;transition:margin-left .22s ease,visibility 0s linear 0s;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;z-index:900}
 #mapa-panel .scroll{overflow-y:auto;flex:1;padding:14px 14px 24px;display:flex;flex-direction:column;gap:14px}
 .mapa-raiz .sheet-h{display:none}
 #mapa-lienzo{flex:1;min-width:0;background:var(--bg)}
@@ -71,9 +71,19 @@
 .mapa-raiz .nota{color:var(--muted);font-size:11.5px;margin:0}
 .mapa-raiz .leido{color:var(--muted);font-size:10.5px;text-align:center;margin:4px 0 0}
 
+/* Panel que se oculta hacia la izquierda (computadora y tableta; en el celular es el panel inferior) */
+#mapa-pestana{position:absolute;z-index:905;top:12px;left:var(--mapa-panel-ocupa);display:flex;align-items:center;gap:6px;height:48px;min-width:26px;padding:0 4px;border:1px solid var(--line);border-left:0;border-radius:0 10px 10px 0;background:var(--surface);color:var(--fg);box-shadow:var(--sombra);cursor:pointer;font:600 12.5px var(--font);transition:left .22s ease}
+#mapa-pestana:hover{color:var(--accent-ink)}
+#mapa-pestana svg{width:16px;height:16px;flex:none;transition:transform .22s ease}
+#mapa-pestana span{padding-right:6px}
+.mapa-raiz.panel-oculto{--mapa-panel-ocupa:0px}
+.mapa-raiz.panel-oculto #mapa-panel{margin-left:calc(-1 * var(--mapa-panel-w));visibility:hidden;transition:margin-left .22s ease,visibility 0s linear .22s}
+.mapa-raiz.panel-oculto #mapa-pestana{padding:0 6px 0 8px}
+.mapa-raiz.panel-oculto #mapa-pestana svg{transform:rotate(180deg)}
+
 /* Controles sobre el mapa */
 .mapa-raiz .ctl{position:absolute;z-index:800;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sombra)}
-#mapa-leyenda{left:calc(var(--mapa-panel-w) + 12px);bottom:28px;max-width:230px;font-size:11.5px;z-index:690}
+#mapa-leyenda{left:calc(var(--mapa-panel-ocupa) + 12px);transition:left .22s ease;bottom:28px;max-width:230px;font-size:11.5px;z-index:690}
 #mapa-leyenda > button{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;padding:8px 12px;cursor:pointer;font-weight:600;font-size:12px;color:var(--fg)}
 #mapa-leyenda > button svg{width:14px;height:14px;margin-left:auto;transition:transform .15s}
 #mapa-leyenda[data-open="false"] > button svg{transform:rotate(180deg)}
@@ -84,7 +94,7 @@
 .mapa-raiz .lg .pl{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.2)}
 .mapa-raiz .lg .pl svg{width:11px;height:11px}
 .mapa-raiz .lg-sep{border-top:1px solid var(--line);margin:3px 0}
-#mapa-banner{z-index:1000;left:calc(50% + var(--mapa-panel-w) / 2);top:12px;transform:translateX(-50%);padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:calc(100% - var(--mapa-panel-w) - 24px);border-left:4px solid var(--yellow);font-size:12.5px}
+#mapa-banner{z-index:1000;left:calc(50% + var(--mapa-panel-ocupa) / 2);top:12px;transform:translateX(-50%);padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;max-width:calc(100% - var(--mapa-panel-ocupa) - 24px);border-left:4px solid var(--yellow);font-size:12.5px}
 #mapa-banner select{width:auto;min-width:160px}
 #mapa-btn-filtros{display:none}
 /* Botón y menú de capas (estilo Google Maps) */
@@ -189,6 +199,9 @@
 
 /* Celular: mapa a pantalla completa, filtros en panel inferior deslizable (dentro del área del módulo) */
 @media (max-width:760px){
+  #mapa-pestana{display:none}
+  .mapa-raiz,.mapa-raiz.panel-oculto{--mapa-panel-ocupa:0px}
+  .mapa-raiz.panel-oculto #mapa-panel{margin-left:0;visibility:visible}
   #mapa-panel{position:absolute;left:0;right:0;bottom:0;width:auto;max-height:80%;border-right:0;border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.25);transform:translateY(105%);transition:transform .22s ease;z-index:1500}
   #mapa-panel.abierto{transform:none}
   .mapa-raiz .sheet-h{display:flex;align-items:center;justify-content:space-between;padding:8px 14px 4px;position:relative}

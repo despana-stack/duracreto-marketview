@@ -53,9 +53,12 @@ const movil = () => matchMedia('(max-width:760px)').matches;
 const oscuro = () => !!(CTX && CTX.tema() === 'dark');
 const corto = n => String(n || '').replace(/^Duracreto\s*-\s*Planta\s*/i, '').replace(/^Duracreto\s*-\s*/i, '');
 const activo = a => /^s[ií]/i.test(String(a.activo || ''));
-const PREF = 'mv-mapa-pref';
-function guardarPref() { try { localStorage.setItem(PREF, JSON.stringify({ capas: S.capas, base: S.base, leyenda: S.leyenda, ui: S.ui })); } catch (e) {} }
-function leerPref() { try { return JSON.parse(localStorage.getItem(PREF) || 'null'); } catch (e) { return null; } }
+/* Preferencias de cada persona en ese teléfono o computadora: tipo de mapa, capas encendidas, leyenda y panel oculto.
+   Las secciones del panel NO se guardan: al abrir el mapa solo «Plantas» está desplegada.
+   v: 2 = desde la 1.3.0 (calor de demanda encendido por defecto; se ignoran las capas guardadas con la versión anterior). */
+const PREF = 'mv-mapa-pref', PREF_V = 2;
+function guardarPref() { try { localStorage.setItem(PREF, JSON.stringify({ v: PREF_V, capas: S.capas, base: S.base, leyenda: S.leyenda, panelOculto: S.panelOculto })); } catch (e) {} }
+function leerPref() { try { const p = JSON.parse(localStorage.getItem(PREF) || 'null'); if (p && p.v !== PREF_V) delete p.capas; return p; } catch (e) { return null; } }
 function aviso(m, tipo) { if (CTX) CTX.aviso(m, tipo); }
 
 /* ---------- íconos ---------- */
@@ -107,9 +110,9 @@ function estadoNuevo() {
   S = {
     d: null, sucio: false, visible: true, cargado: 0,
     f: { q: '', ocultos: { pais: new Set(), estado: new Set(), tipo: new Set(), neg: new Set(), pl: new Set() }, asesor: '', zona: '', segmento: '', planta: '', comp: '', mes: '' },
-    capas: Object.assign({ proyectos: true, plantas: true, calor: false, geocercas: false, terrenos: false, clientes: false }, pref.capas || {}),
-    base: pref.base || '', ui: Object.assign({ mas: false, lista: false, proy: true, plantas: true, extra: false }, pref.ui || {}),
-    suelto: false, leyenda: pref.leyenda !== undefined ? pref.leyenda : false,
+    capas: Object.assign({ proyectos: true, plantas: true, calor: true, geocercas: false, terrenos: false, clientes: false }, pref.capas || {}),
+    base: pref.base || '', ui: { mas: false, lista: false, proy: false, plantas: true, extra: false },
+    suelto: false, leyenda: pref.leyenda !== undefined ? pref.leyenda : false, panelOculto: !!pref.panelOculto,
     geoVis: {}, editGeo: null, mover: null, vistaInicial: false, pendiente: null
   };
   M = { map: null, base: null, ref: null, cluster: null, plantas: null, radio: null, calor: null, geo: null, ter: null, cli: null, mask: null, edit: null, marcas: {}, plMarcas: {} };
@@ -211,7 +214,8 @@ function contar(campo, fn) {
 
 /* ---------- estructura ---------- */
 function esqueleto() {
-  RAIZ.innerHTML = `<div class="mapa-raiz">
+  RAIZ.innerHTML = `<div class="mapa-raiz${S.panelOculto ? ' panel-oculto' : ''}">
+    <button id="mapa-pestana" type="button" aria-controls="mapa-panel"></button>
     <aside id="mapa-panel" aria-label="Filtros y capas">
       <div class="sheet-h"><b>Filtros</b><button class="btn ghost" type="button" data-accion="cerrar-panel">Listo</button></div>
       <div class="scroll" id="mapa-panel-scroll"><div class="mapa-cargando"><span class="mv-giro"></span> Cargando proyectos…</div></div>
@@ -392,8 +396,27 @@ function abrirCapas(abrir) {
   const pop = $('capas-pop'); pop.hidden = !abrir; $('btn-capas').setAttribute('aria-expanded', String(abrir));
   if (abrir) { dibujarCapasPop(); if (movil()) cerrarPanel(); }
 }
+/* Computadora: el panel se oculta hacia la izquierda con la pestaña del borde (en el celular es el panel inferior «Filtros»). */
+const IC_PESTANA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>';
+function pintarPestana() {
+  const b = $('pestana'); if (!b) return;
+  const txt = S.panelOculto ? 'Mostrar filtros y capas' : 'Ocultar filtros y capas';
+  b.innerHTML = IC_PESTANA + (S.panelOculto ? '<span>Filtros</span>' : '');
+  b.title = txt; b.setAttribute('aria-label', txt); b.setAttribute('aria-expanded', String(!S.panelOculto));
+}
+function alternarPanel() {
+  S.panelOculto = !S.panelOculto; guardarPref();
+  RAIZ.querySelector('.mapa-raiz').classList.toggle('panel-oculto', S.panelOculto);
+  pintarPestana();
+  if (S.panelOculto) cerrarSug();
+  // Leaflet necesita recalcular el tamaño cuando el mapa se agranda o se achica.
+  setTimeout(() => M.map && M.map.invalidateSize({ pan: false }), 260);
+}
+
 function eventos() {
   const raiz = RAIZ.querySelector('.mapa-raiz'), panel = $('panel'), pop = $('capas-pop');
+  pintarPestana();
+  $('pestana').addEventListener('click', alternarPanel);
   $('btn-capas').addEventListener('click', () => abrirCapas(pop.hidden));
   $('btn-filtros').addEventListener('click', () => { abrirCapas(false); panel.classList.add('abierto'); });
   raiz.addEventListener('click', ev => {
@@ -419,7 +442,9 @@ function eventos() {
   raiz.addEventListener('change', ev => {
     const t = ev.target; if (!S.d || !(panel.contains(t) || pop.contains(t))) return;
     if (t.dataset.f) { S.f[t.dataset.f] = t.value; dibujarPanel(); actualizar(); if (t.dataset.f !== 'mes') encuadrarFiltrados(); return; }
-    if (t.dataset.capa) { S.capas[t.dataset.capa] = t.checked; guardarPref(); if (t.dataset.capa === 'geocercas') dibujarGeoLista(); if (t.dataset.capa === 'plantas') dibujarPanel(); dibujarCapa(t.dataset.capa); return; }
+    if (t.dataset.capa) { S.capas[t.dataset.capa] = t.checked; guardarPref(); if (t.dataset.capa === 'geocercas') dibujarGeoLista(); if (t.dataset.capa === 'plantas') dibujarPanel(); dibujarCapa(t.dataset.capa);
+      if (t.dataset.capa === 'calor' && t.checked && !L.heatLayer) aviso('La capa de calor no está disponible en este momento.', 'error');
+      return; }
     if (t.dataset.geo !== undefined) { S.geoVis[t.dataset.geo] = t.checked; dibujarCapa('geocercas'); }
   });
   let tq;
@@ -571,7 +596,7 @@ function dibujarCapa(k) {
   if (k === 'calor') {
     if (M.calor) { map.removeLayer(M.calor); M.calor = null; }
     if (!S.capas.calor) return;
-    if (!L.heatLayer) { aviso('La capa de calor no está disponible en este momento.', 'error'); return; }
+    if (!L.heatLayer) return;   // la librería es opcional; si no cargó, el aviso sale solo cuando la persona enciende la capa
     const ps = filtrar().filter(p => estadoK(p.estado) === 'perspectiva' && p.lat != null);
     const vols = ps.map(p => Number(p.vol) || 0).sort((a, b) => a - b), tope = vols[Math.floor(vols.length * .9)] || 1;
     M.calor = L.heatLayer(ps.map(p => [p.lat, p.lng, Math.max(.15, Math.min(1, (Number(p.vol) || 0) / tope))]), { radius: 28, blur: 22, maxZoom: 13, minOpacity: .25, gradient: { .2: '#F9C200', .55: '#F07800', .85: '#D93025' } }).addTo(map);

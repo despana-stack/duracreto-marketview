@@ -21,7 +21,7 @@
  */
 (function () {
   'use strict';
-  const VERSION = '1.2.0';              // súbala junto con VERSION en sw.js cada vez que publique cambios
+  const VERSION = '1.3.0';              // súbala junto con VERSION en sw.js cada vez que publique cambios
   const API_URL = String(window.API_URL || '').trim();
   const DEMO = !API_URL;
   const K = { ses: 'mv_sesion', mod: 'mv_modulo', tema: 'mv_tema', tip: 'mv_tip_instalar' };
@@ -172,13 +172,12 @@
     }
     $('#app').innerHTML = `
       <header class="mv-top">
-        <a class="mv-marca" href="#${mods[0].id}" aria-label="Inicio de MarketView"><img src="icons/icon-192.png" alt=""><div><small>MarketView</small><b id="mvTit"></b></div></a>
+        <a class="mv-marca" href="#${mods[0].id}" aria-label="Inicio de MarketView"><img src="icons/icon-192.png" alt=""><b><span class="mv-marca-app">MarketView</span><span class="mv-marca-mod" id="mvTit"></span></b></a>
+        <nav class="mv-nav" id="mvNav" aria-label="Módulos" ${mods.length < 2 ? 'data-uno' : ''}>
+          ${mods.map(m => `<button data-mod="${m.id}" title="${esc(m.largo)}"><span class="ic">${I[m.id] || I.mapa}</span><em>${esc(m.nom)}</em></button>`).join('')}
+        </nav>
         <div class="mv-top-acc"><button class="mv-yo" id="mvYo" aria-label="Menú de ${esc(S.usuario.nombre)}" aria-haspopup="true">${esc(iniciales(S.usuario.nombre))}</button></div>
       </header>
-      <nav class="mv-nav" id="mvNav" aria-label="Módulos" ${mods.length < 2 ? 'data-uno' : ''}>
-        ${mods.map(m => `<button data-mod="${m.id}"><span class="ic">${I[m.id] || I.mapa}</span><em>${esc(esCelular() ? m.nom : m.largo)}</em></button>`).join('')}
-        <div class="mv-nav-pie">Duracreto MarketView · v${VERSION}</div>
-      </nav>
       <main id="mv-main" class="${mods.length < 2 && esCelular() ? 'sin-nav' : ''}"></main>`;
     if (mods.length < 2 && esCelular()) $('#mvNav').hidden = true;
     $('#mvNav').onclick = e => { const b = e.target.closest('[data-mod]'); if (b) irA(b.dataset.mod); };
@@ -206,7 +205,7 @@
     const m = MODX[id];
     if (location.hash.replace(/^#/, '').split('?')[0] !== id) history.replaceState(null, '', '#' + id);
     store.set(K.mod, id);
-    document.title = m.largo + ' · MarketView';
+    document.title = 'MarketView';            // corto: es lo que se ve en la barra de la ventana y en la pestaña
     const tit = $('#mvTit'); if (tit) tit.textContent = m.largo;
     document.querySelectorAll('#mvNav [data-mod]').forEach(b => { if (b.dataset.mod === id) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
 
@@ -386,8 +385,7 @@
   let anchoCel = esCelular();
   window.addEventListener('resize', () => { if (S && esCelular() !== anchoCel) { anchoCel = esCelular(); vistaAppKeep(); } });
   function vistaAppKeep() {
-    // Cambió entre celular y computadora: solo se ajustan los textos del menú (los módulos no se vuelven a montar).
-    document.querySelectorAll('#mvNav [data-mod]').forEach(b => { const m = MODX[b.dataset.mod]; b.querySelector('em').textContent = esCelular() ? m.nom : m.largo; });
+    // Cambió entre celular y computadora: el menú pasa de abajo (celular) al encabezado (computadora); los módulos no se vuelven a montar.
     const nav = $('#mvNav'), main = $('#mv-main');
     if (nav && main) { const uno = misModulos().length < 2; nav.hidden = uno && esCelular(); main.classList.toggle('sin-nav', uno && esCelular()); }
   }
