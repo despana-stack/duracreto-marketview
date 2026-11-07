@@ -109,7 +109,7 @@ function estadoNuevo() {
   const pref = leerPref() || {};
   S = {
     d: null, sucio: false, visible: true, cargado: 0,
-    f: { q: '', ocultos: { pais: new Set(), estado: new Set(), tipo: new Set(), neg: new Set(), pl: new Set() }, asesor: '', zona: '', segmento: '', planta: '', comp: '', mes: '' },
+    f: { q: '', sel: { pais: new Set(), pl: new Set(), neg: new Set(), tipo: new Set(), estado: new Set() }, asesor: '', zona: '', segmento: '', planta: '', comp: '', mes: '' },
     capas: Object.assign({ proyectos: true, plantas: true, calor: true, geocercas: false, terrenos: false, clientes: false }, pref.capas || {}),
     base: pref.base || '', ui: { mas: false, lista: false, proy: false, plantas: true, extra: false },
     suelto: false, leyenda: pref.leyenda !== undefined ? pref.leyenda : false, panelOculto: !!pref.panelOculto,
@@ -179,11 +179,11 @@ function puedeEditar(p) { return !!(S.d && S.d.registrar && CTX.usuario.roles &&
 /* ---------- filtros ---------- */
 function compN(p) { return String(p.comp || '').trim(); }
 function filtrar(ign) {
-  const f = S.f, o = f.ocultos, q = norm(f.q), d = S.d; if (!d) return [];
+  const f = S.f, q = norm(f.q), d = S.d; if (!d) return [];
   return d.proyectos.filter(p => {
-    if (o.pais.has(paisK(p.pais))) return false;
-    if (ign !== 'estado' && o.estado.has(estadoK(p.estado))) return false;
-    if (ign !== 'tipo' && o.tipo.has(segK(p))) return false;
+    if (fuera('pais', paisK(p.pais))) return false;
+    if (ign !== 'estado' && fuera('estado', estadoK(p.estado))) return false;
+    if (ign !== 'tipo' && fuera('tipo', segK(p))) return false;
     if (f.asesor === '__sin') { if (p.asesor) return false; } else if (f.asesor && norm(p.asesor) !== norm(f.asesor)) return false;
     if (f.zona && p.zona !== f.zona) return false;
     if (f.segmento && p.segmento !== f.segmento) return false;
@@ -194,15 +194,25 @@ function filtrar(ign) {
     return true;
   });
 }
-function nFiltros() { const f = S.f, o = f.ocultos; return [o.pais.size, o.estado.size, o.tipo.size, o.neg.size, o.pl.size, !!f.asesor, !!f.zona, !!f.segmento, !!f.planta, !!f.comp, !!f.mes, !!f.q].filter(Boolean).length; }
-function paisVista() { const o = S.f.ocultos.pais; return o.has('hn') && !o.has('sv') ? 'sv' : o.has('sv') && !o.has('hn') ? 'hn' : 'todos'; }
-function alternar(grupo, k, minimoUno, todas) {
-  const o = S.f.ocultos[grupo];
-  if (o.has(k)) o.delete(k);
-  else { if (minimoUno && todas && todas.filter(x => !o.has(x)).length <= 1) return false; o.add(k); }
-  return true;
+function nFiltros() { const f = S.f, o = f.sel; return [o.pais.size, o.estado.size, o.tipo.size, o.neg.size, o.pl.size, !!f.asesor, !!f.zona, !!f.segmento, !!f.planta, !!f.comp, !!f.mes, !!f.q].filter(Boolean).length; }
+/* Grupos de botones (País, Duracreto o competencia, Tipo de planta, Tipo de proyecto, Estado).
+   S.f.sel[grupo] = botones seleccionados; vacío = «todos» (se ve todo y los botones quedan neutros).
+   Primer toque estando en «todos» → solo ese; los siguientes se suman; tocar uno seleccionado lo quita;
+   si no queda ninguno, o quedan todos los del grupo, el grupo vuelve a «todos». */
+const fuera = (g, k) => S.f.sel[g].size > 0 && !S.f.sel[g].has(k);
+function tocarGrupo(g, k, todas) {
+  const sel = S.f.sel[g];
+  if (sel.has(k)) sel.delete(k); else sel.add(k);
+  if (todas.length && todas.every(x => sel.has(x))) sel.clear();
 }
-function quitarFiltros() { Object.assign(S.f, { q: '', asesor: '', zona: '', segmento: '', planta: '', comp: '', mes: '' }); Object.values(S.f.ocultos).forEach(x => x.clear()); }
+function paisVista() { const o = S.f.sel.pais; return o.size === 1 ? [...o][0] : 'todos'; }
+function pill(g, k, contenido) { return `<button type="button" class="pill" data-g="${g}" data-k="${esc(k)}" aria-pressed="${S.f.sel[g].has(k)}">${contenido}</button>`; }
+function grupo(g, titulo, botones) {
+  const f = S.f.sel[g].size > 0;
+  return `<div class="grupo" data-grupo="${g}"><div class="sub-h"><p class="sub">${titulo}</p>${f ? `<button type="button" class="todos" data-todos="${g}" aria-label="Mostrar todos: ${titulo}">Todos</button>` : ''}</div>
+    <div class="pills${f ? ' filtrado' : ''}" role="group" aria-label="${titulo}">${botones}</div></div>`;
+}
+function quitarFiltros() { Object.assign(S.f, { q: '', asesor: '', zona: '', segmento: '', planta: '', comp: '', mes: '' }); Object.values(S.f.sel).forEach(x => x.clear()); }
 function opciones(valores, sel, todos) {
   return `<option value="">${esc(todos)}</option>` + valores.map(v => `<option value="${esc(v.v)}"${v.v === sel ? ' selected' : ''}>${esc(v.n)}${v.c != null ? ' (' + v.c + ')' : ''}</option>`).join('');
 }
@@ -239,21 +249,21 @@ function encabezado(k, titulo, extra, capa) {
   return `<div class="bloque-h"><button type="button" data-sec="${k}" aria-expanded="${!!S.ui[k]}"><svg class="fl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>${titulo}${extra ? ` <small>${extra}</small>` : ''}</button>${capa ? `<label class="sw" title="Mostrar u ocultar en el mapa"><input type="checkbox" data-capa="${capa}"${S.capas[capa] ? ' checked' : ''} aria-label="Mostrar ${titulo} en el mapa"><i></i></label>` : ''}</div>`;
 }
 function plantasVisibles(ignQ) {
-  const f = S.f, o = f.ocultos, q = norm(f.q);
+  const f = S.f, o = f.sel, q = norm(f.q);
   if (!S.capas.plantas) return [];
   return S.d.plantas.filter(pl => {
     if (pl.lat == null || pl.lng == null || /^no/i.test(String(pl.activa || ''))) return false;
     const propia = /propia/i.test(pl.tipo || '');
-    if (o.pl.has(propia ? 'propia' : 'comp')) return false;
-    if (o.pais.has(paisK(pl.pais))) return false;
+    if (fuera('pl', propia ? 'propia' : 'comp')) return false;
+    if (fuera('pais', paisK(pl.pais))) return false;
     const negs = pl.negocios || [];
-    if (o.neg.size && !negs.some(n => !o.neg.has(n))) return false;
+    if (o.neg.size && !negs.some(n => o.neg.has(n))) return false;
     if (!ignQ && q && norm([pl.nombre, pl.empresa, pl.ciudad].join(' ')).indexOf(q) < 0) return false;
     return true;
   });
 }
 function dibujarPanel() {
-  const d = S.d, f = S.f, o = f.ocultos;
+  const d = S.d, f = S.f;
   const asesores = contar('asesor');
   d.asesores.filter(activo).forEach(a => { if (!asesores.some(x => norm(x.v) === norm(a.nombre))) asesores.push({ v: a.nombre, n: a.nombre, c: 0 }); });
   asesores.sort((a, b) => a.n.localeCompare(b.n, 'es'));
@@ -261,13 +271,9 @@ function dibujarPanel() {
   const meses = contar('mes').sort((a, b) => String(a.v).localeCompare(String(b.v))).map(x => ({ v: x.v, n: fmtMes(x.v), c: x.c }));
   const mio = !!(d.miAsesor && norm(f.asesor) === norm(d.miAsesor)), nm = nMas();
   const negs = Object.keys(NEGOCIO_N).filter(n => d.plantas.some(pl => (pl.negocios || []).indexOf(n) >= 0));
-  const on = (g, k) => !o[g].has(k);
   $('panel-scroll').innerHTML = `
     <div class="sec">
-      <div class="pills" role="group" aria-label="País">
-        <button type="button" class="pill" data-pais="hn" aria-pressed="${on('pais', 'hn')}">Honduras</button>
-        <button type="button" class="pill" data-pais="sv" aria-pressed="${on('pais', 'sv')}">El Salvador</button>
-      </div>
+      ${grupo('pais', 'País', pill('pais', 'hn', 'Honduras') + pill('pais', 'sv', 'El Salvador'))}
       <div class="buscar">${IC.buscar}<input type="search" id="mapa-q" placeholder="Buscar cliente, proyecto o planta" value="${esc(f.q)}" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="mapa-sug"><div id="mapa-sug" class="sug" role="listbox" hidden></div></div>
       ${d.miAsesor ? `<div class="seg dos" role="group" aria-label="Qué proyectos ver"><button type="button" data-vista="mios" aria-pressed="${mio}">Mis proyectos</button><button type="button" data-vista="equipo" aria-pressed="${!f.asesor}">Todo el equipo</button></div>` : ''}
     </div>
@@ -275,12 +281,10 @@ function dibujarPanel() {
     <div class="bloque">
       ${encabezado('plantas', 'Plantas', `(${plantasVisibles().length})`, 'plantas')}
       <div class="desp" ${S.ui.plantas ? '' : 'hidden'}>
-        <div class="pills">
-          <button type="button" class="pill" data-pl="propia" aria-pressed="${on('pl', 'propia')}"><span class="pt propia" style="width:18px;height:18px;border-width:1.5px;box-shadow:none">${GLIFO.concreto}</span>Duracreto</button>
-          <button type="button" class="pill" data-pl="comp" aria-pressed="${on('pl', 'comp')}"><span class="pt comp" style="width:18px;height:18px;border-radius:5px;box-shadow:none">${glifo('concreto', '#5E5E5A')}</span>Competencia</button>
-        </div>
-        <p class="sub">Tipo de planta</p>
-        <div class="pills">${negs.map(n => `<button type="button" class="pill" data-neg="${n}" aria-pressed="${on('neg', n)}">${glifo(n, COLOR_NEG[n])}${NEGOCIO_N[n]}</button>`).join('')}</div>
+        ${grupo('pl', 'Duracreto o competencia',
+          pill('pl', 'propia', `<span class="pt propia" style="width:18px;height:18px;border-width:1.5px;box-shadow:none">${GLIFO.concreto}</span>Duracreto`) +
+          pill('pl', 'comp', `<span class="pt comp" style="width:18px;height:18px;border-radius:5px;box-shadow:none">${glifo('concreto', '#5E5E5A')}</span>Competencia`))}
+        ${grupo('neg', 'Tipo de planta', negs.map(n => pill('neg', n, glifo(n, COLOR_NEG[n]) + NEGOCIO_N[n])).join(''))}
         <p class="nota">Pase el mouse (o toque, en el celular) sobre una planta de concreto Duracreto para ver su radio de 20 km.</p>
       </div>
     </div>
@@ -288,10 +292,8 @@ function dibujarPanel() {
     <div class="bloque">
       ${encabezado('proy', 'Proyectos', '', 'proyectos')}
       <div class="desp" ${S.ui.proy ? '' : 'hidden'}>
-        <p class="sub">Tipo de proyecto</p>
-        <div class="pills" id="mapa-pills-tipo"></div>
-        <p class="sub">Estado</p>
-        <div class="pills" id="mapa-pills-estado"></div>
+        <div id="mapa-g-tipo"></div>
+        <div id="mapa-g-estado"></div>
         <div id="mapa-resumen"></div>
         <button type="button" class="mas" data-accion="mas" aria-expanded="${S.ui.mas}">Más filtros${nm ? ` <em>${nm}</em>` : ''}${IC.flecha}</button>
         <div class="desp" ${S.ui.mas ? '' : 'hidden'}>
@@ -334,13 +336,14 @@ function dibujarCapasPop() {
     ${oscuro() ? `<p class="nota">En modo oscuro se usa un mapa gris oscuro (salvo satélite).</p>` : ''}`;
 }
 function dibujarResumen() {
-  const vis = filtrar(), o = S.f.ocultos;
+  const vis = filtrar(), o = S.f.sel;
   const vol = vis.reduce((s, p) => s + (Number(p.vol) || 0), 0);
   const porE = {}; filtrar('estado').forEach(p => { const k = estadoK(p.estado); porE[k] = (porE[k] || 0) + 1; });
   const porT = {}; filtrar('tipo').forEach(p => { const k = segK(p); porT[k] = (porT[k] || 0) + 1; });
   const sinUb = vis.filter(p => p.lat == null || p.lng == null).length, aprox = vis.filter(p => esAprox(p)).length;
-  const pt = $('pills-tipo'); if (pt) pt.innerHTML = ['vertical', 'casa', 'industria', 'vial', 'otro'].filter(k => porT[k] || o.tipo.has(k)).map(k => `<button type="button" class="pill" data-tipo="${k}" aria-pressed="${!o.tipo.has(k)}">${icoSeg(k, 17)}${SEG_CORTO[k]}<small>${porT[k] || 0}</small></button>`).join('');
-  const pe = $('pills-estado'); if (pe) pe.innerHTML = ESTADOS.filter(e => porE[e.k] || o.estado.has(e.k)).map(e => `<button type="button" class="pill" data-estado="${e.k}" aria-pressed="${!o.estado.has(e.k)}"><i class="e-${e.k}"></i>${e.n}<small>${porE[e.k] || 0}</small></button>`).join('');
+  // Botones con proyectos (contados sin el filtro de su propio grupo) y los ya seleccionados.
+  const pt = $('g-tipo'); if (pt) pt.innerHTML = grupo('tipo', 'Tipo de proyecto', ['vertical', 'casa', 'industria', 'vial', 'otro'].filter(k => porT[k] || o.tipo.has(k)).map(k => pill('tipo', k, `${icoSeg(k, 17)}${SEG_CORTO[k]}<small>${porT[k] || 0}</small>`)).join(''));
+  const pe = $('g-estado'); if (pe) pe.innerHTML = grupo('estado', 'Estado', ESTADOS.filter(e => porE[e.k] || o.estado.has(e.k)).map(e => pill('estado', e.k, `<i class="e-${e.k}"></i>${e.n}<small>${porE[e.k] || 0}</small>`)).join(''));
   const el = $('resumen');
   if (el) el.innerHTML = `<div class="kpi-l"><span><b class="num">${fmt0(vis.length)}</b> proyectos</span><span><b class="num">${fmt0(vol)}</b> m³</span></div>
     ${sinUb || aprox ? `<p class="nota" style="margin-top:4px">${aprox ? `${aprox} con ubicación aproximada (borde punteado).` : ''}${sinUb ? ` ${sinUb} sin ubicación en el mapa.` : ''}</p>` : ''}`;
@@ -424,12 +427,16 @@ function eventos() {
     if (b.dataset.sug === 'todas') { aplicarBusqueda($('q').value); if (movil()) cerrarPanel(); encuadrarFiltrados(); return; }
     if (b.dataset.sugP) { const id = b.dataset.sugP; $('q').value = ''; aplicarBusqueda(''); abrirProyecto(id); return; }
     if (b.dataset.sugPl) { const id = b.dataset.sugPl; $('q').value = ''; aplicarBusqueda(''); irAPlanta(id); return; }
-    if (b.dataset.pais) { if (!alternar('pais', b.dataset.pais, true, ['hn', 'sv'])) { aviso('Deje al menos un país seleccionado.'); return; } dibujarPanel(); encuadrar(paisVista()); actualizar(); dibujarCapa('plantas'); return; }
+    if (b.dataset.g || b.dataset.todos) {
+      const g = b.dataset.g || b.dataset.todos;
+      if (b.dataset.todos) S.f.sel[g].clear();
+      else tocarGrupo(g, b.dataset.k, [...b.closest('.pills').querySelectorAll('[data-k]')].map(x => x.dataset.k));
+      if (g === 'tipo' || g === 'estado') { actualizar(); return; }
+      dibujarPanel(); dibujarCapa('plantas');
+      if (g === 'pais') { encuadrar(paisVista()); actualizar(); }
+      return;
+    }
     if (b.dataset.vista) { S.f.asesor = b.dataset.vista === 'mios' ? S.d.miAsesor : ''; dibujarPanel(); actualizar(); encuadrarFiltrados(); return; }
-    if (b.dataset.estado) { alternar('estado', b.dataset.estado); actualizar(); return; }
-    if (b.dataset.tipo) { alternar('tipo', b.dataset.tipo); actualizar(); return; }
-    if (b.dataset.neg) { alternar('neg', b.dataset.neg); dibujarPanel(); dibujarCapa('plantas'); return; }
-    if (b.dataset.pl) { alternar('pl', b.dataset.pl); dibujarPanel(); dibujarCapa('plantas'); return; }
     if (b.dataset.sec) { const k = b.dataset.sec; S.ui[k] = !S.ui[k]; guardarPref(); dibujarPanel(); return; }
     if (b.dataset.base) { S.base = b.dataset.base; guardarPref(); ponerBase(); dibujarCapasPop(); return; }
     if (b.dataset.proy) { abrirProyecto(b.dataset.proy); return; }
@@ -571,10 +578,10 @@ function dibujarCapa(k) {
   }
   if (k === 'plantas') {
     M.plantas.clearLayers(); M.plMarcas = {}; M.radio.clearLayers();
-    const off = S.f.ocultos.neg;
+    const selNeg = S.f.sel.neg;
     plantasVisibles().forEach(pl => {
       const propia = /propia/i.test(pl.tipo || '');
-      const negs = (pl.negocios || []), prim = negs.find(n => !off.has(n)) || negs[0] || 'concreto';
+      const negs = (pl.negocios || []), prim = negs.find(n => !selNeg.size || selNeg.has(n)) || negs[0] || 'concreto';
       const html = propia ? `<div class="pt propia">${GLIFO[prim] || GLIFO.concreto}${negs.length > 1 ? `<b>${negs.length}</b>` : ''}</div>`
         : `<div class="pt comp">${glifo(prim, COLOR_NEG[prim] || '#5E5E5A')}</div>`;
       const m = L.marker([pl.lat, pl.lng], { pane: 'plantas', zIndexOffset: propia ? 900 : 700, icon: L.divIcon({ className: 'mc-sin-fondo', html, iconSize: propia ? [30, 30] : [24, 24], iconAnchor: propia ? [15, 15] : [12, 12], popupAnchor: [0, -12] }) });
