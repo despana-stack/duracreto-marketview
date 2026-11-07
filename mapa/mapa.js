@@ -91,10 +91,22 @@ const SEG_N = { vertical: 'Edificación vertical', casa: 'Horizontal / residenci
 const SEG_CORTO = { vertical: 'Vertical', casa: 'Horizontal', industria: 'Industrial', vial: 'Vial', otro: 'Otro' };
 const segK = p => { const n = norm(p.segmento) + ' ' + norm(p.tipo); if (/vertical|torre|edificio|apartament/.test(n)) return 'vertical'; if (/horizontal|residencial|urbaniz|casa|vivienda|condomin/.test(n)) return 'casa'; if (/industrial|bodega|nave|planta/.test(n)) return 'industria'; if (/vial|infraestructura|pavimen|puente|carretera|desnivel/.test(n)) return 'vial'; return 'otro'; };
 const icoSeg = (sk, t) => `<svg viewBox="0 0 24 24" width="${t}" height="${t}" aria-hidden="true">${SEG_ICO[sk]}</svg>`;
-/* Marcador: círculo blanco, borde del color del estado (punteado si la ubicación es aproximada). */
+/* Marcador de proyecto (mapa, lista y buscador): el ícono del tipo suelto, con halo blanco, y un punto del color
+   del estado en la esquina inferior derecha (hueco = ubicación aproximada). */
 function pinSvg(ek, sk, aprox, w) {
-  w = w || 30;
-  return `<span class="mk${aprox ? ' ax' : ''}" style="width:${w}px;height:${w}px;border-color:var(--mapa-${ek})">${icoSeg(sk, Math.round(w * .64))}</span>`;
+  w = w || 28;
+  const d = w >= 24 ? 11 : 8;
+  return `<span class="mk-s${aprox ? ' ax' : ''}" style="--w:${w}px;--d:${d}px;--c:var(--mapa-${ek})">${icoSeg(sk, w)}<i></i></span>`;
+}
+/* Grupo de proyectos: ícono del tipo que más se repite (empate: vertical > industria > vial > casa > otro). */
+const PRIORIDAD_TIPO = ['vertical', 'industria', 'vial', 'casa', 'otro'];
+function tipoDominante(tipos) {
+  const cnt = {}; tipos.forEach(t => { cnt[t] = (cnt[t] || 0) + 1; });
+  return PRIORIDAD_TIPO.reduce((mejor, t) => (cnt[t] || 0) > (cnt[mejor] || 0) ? t : mejor, PRIORIDAD_TIPO.find(t => cnt[t]) || 'otro');
+}
+function grupoSvg(sk, n) {
+  const capas = n >= 3 ? 2 : 1;
+  return `<span class="cg" data-n="${n}">${capas > 1 ? `<span class="cg-sil s2">${icoSeg(sk, 32)}</span>` : ''}<span class="cg-sil s1">${icoSeg(sk, 32)}</span><span class="cg-ico">${icoSeg(sk, 32)}</span><b>${n}</b></span>`;
 }
 const COLOR_NEG = { concreto: '#1D5FA8', agregados: '#8A6D1F', bloques: '#C2410C', prefabricados: '#0F766E', cemento: '#5E5E5A' };
 const glifo = (k, color) => (GLIFO[k] || GLIFO.concreto).replace(/#fff/g, color);
@@ -112,7 +124,7 @@ function estadoNuevo() {
     f: { q: '', sel: { pais: new Set(), pl: new Set(), neg: new Set(), tipo: new Set(), estado: new Set() }, asesor: '', zona: '', segmento: '', planta: '', comp: '', mes: '' },
     capas: Object.assign({ proyectos: true, plantas: true, calor: true, geocercas: false, terrenos: false, clientes: false }, pref.capas || {}),
     base: pref.base || '', ui: { mas: false, lista: false, proy: false, plantas: true, extra: false },
-    suelto: false, leyenda: pref.leyenda !== undefined ? pref.leyenda : false, panelOculto: !!pref.panelOculto,
+    leyenda: pref.leyenda !== undefined ? pref.leyenda : false, panelOculto: !!pref.panelOculto,
     geoVis: {}, editGeo: null, mover: null, vistaInicial: false, pendiente: null
   };
   M = { map: null, base: null, ref: null, cluster: null, plantas: null, radio: null, calor: null, geo: null, ter: null, cli: null, mask: null, edit: null, marcas: {}, plMarcas: {} };
@@ -346,7 +358,7 @@ function dibujarResumen() {
   const pe = $('g-estado'); if (pe) pe.innerHTML = grupo('estado', 'Estado', ESTADOS.filter(e => porE[e.k] || o.estado.has(e.k)).map(e => pill('estado', e.k, `<i class="e-${e.k}"></i>${e.n}<small>${porE[e.k] || 0}</small>`)).join(''));
   const el = $('resumen');
   if (el) el.innerHTML = `<div class="kpi-l"><span><b class="num">${fmt0(vis.length)}</b> proyectos</span><span><b class="num">${fmt0(vol)}</b> m³</span></div>
-    ${sinUb || aprox ? `<p class="nota" style="margin-top:4px">${aprox ? `${aprox} con ubicación aproximada (borde punteado).` : ''}${sinUb ? ` ${sinUb} sin ubicación en el mapa.` : ''}</p>` : ''}`;
+    ${sinUb || aprox ? `<p class="nota" style="margin-top:4px">${aprox ? `${aprox} con ubicación aproximada (punto hueco).` : ''}${sinUb ? ` ${sinUb} sin ubicación en el mapa.` : ''}</p>` : ''}`;
   const n = nFiltros(), nf = $('n-filtros'); if (nf) { nf.textContent = n; nf.hidden = !n; }
   const lim = RAIZ.querySelector('[data-accion="limpiar"]'); if (lim) lim.hidden = !n;
   const nl = $('n-lista'); if (nl) nl.textContent = '(' + vis.filter(p => p.lat != null).length + ')';
@@ -487,12 +499,8 @@ function crearMapa() {
   ponerBase();
   encuadrar('todos', true);
   map.on('click', () => { if (movil()) cerrarPanel(); abrirCapas(false); });
-  const zl = () => {
-    map.getContainer().classList.toggle('z-lejos', map.getZoom() < 11);
-    /* De cerca (zoom 15+), los íconos van sueltos, sin círculo blanco. */
-    const su = map.getZoom() >= 15; if (su !== S.suelto) { S.suelto = su; dibujarCapa('proyectos'); }
-  };
-  map.on('zoomend', zl); S.suelto = map.getZoom() >= 15; zl();
+  const zl = () => { map.getContainer().classList.toggle('z-lejos', map.getZoom() < 11); };
+  map.on('zoomend', zl); zl();
   M.radio.addTo(map);
 }
 function capaEsri(ruta, nz, attr, extra) {
@@ -564,10 +572,8 @@ function dibujarCapa(k) {
       lista.forEach(p => {
         if (S.mover && S.mover.p.id === p.id) return;
         const ek = estadoK(p.estado), sk = segK(p), ax = esAprox(p);
-        const icon = S.suelto
-          ? L.divIcon({ className: 'mc-sin-fondo', html: `<span class="mk-s${ax ? ' ax' : ''}">${icoSeg(sk, 28)}<i style="--c:var(--mapa-${ek});background:var(--c)"></i></span>`, iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -12] })
-          : L.divIcon({ className: 'mc-sin-fondo', html: pinSvg(ek, sk, ax, 30), iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -14] });
-        const m = L.marker(pos[p.id], { icon, est: ek, keyboard: false, title: p.proyecto || '' });
+        const icon = L.divIcon({ className: 'mc-sin-fondo', html: pinSvg(ek, sk, ax, 28), iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -14] });
+        const m = L.marker(pos[p.id], { icon, est: ek, tipo: sk, keyboard: false, title: p.proyecto || '' });
         m.bindPopup(() => fichaProyecto(p), { maxWidth: 320, autoPanPadding: [20, 20] });
         M.marcas[p.id] = m; ms.push(m);
       });
@@ -642,14 +648,10 @@ function dibujarCapa(k) {
   }
 }
 
-function colorEstado(k) { return getComputedStyle(RAIZ.querySelector('.mapa-raiz')).getPropertyValue('--mapa-' + k).trim() || '#999'; }
+/* Ícono de un grupo: el tipo que más se repite, con siluetas apiladas detrás y el número de proyectos. */
 function iconoCluster(c) {
-  const ms = c.getAllChildMarkers(), n = ms.length, cnt = {};
-  ms.forEach(m => { cnt[m.options.est] = (cnt[m.options.est] || 0) + 1; });
-  let acc = 0;
-  const stops = ESTADOS.filter(e => cnt[e.k]).map(e => { const a = acc / n * 360; acc += cnt[e.k]; return `${colorEstado(e.k)} ${a.toFixed(1)}deg ${(acc / n * 360).toFixed(1)}deg`; });
-  const t = n < 10 ? 30 : n < 50 ? 34 : n < 200 ? 40 : 46;
-  return L.divIcon({ html: `<div class="cl" style="width:${t}px;height:${t}px;background:conic-gradient(${stops.join(',')})"><span>${n}</span></div>`, className: 'mc-sin-fondo', iconSize: [t, t] });
+  const ms = c.getAllChildMarkers();
+  return L.divIcon({ html: grupoSvg(tipoDominante(ms.map(m => m.options.tipo)), ms.length), className: 'mc-sin-fondo mc-grupo', iconSize: [40, 40], iconAnchor: [18, 22] });
 }
 
 /* ---------- fichas ---------- */
@@ -694,7 +696,7 @@ function fichaTerreno(t) {
     <dl>${[['Uso', t.uso], ['Área', t.area ? fmt0(t.area) + ' m²' : ''], ['Precio', t.precio ? 'L ' + fmt0(t.precio) : '']].filter(f => f[1]).map(f => `<dt>${f[0]}</dt><dd>${esc(f[1])}</dd>`).join('')}</dl>
     <div class="acc">${botonRuta(t.lat, t.lng)}</div></div>`;
 }
-/** Acerca hasta que los íconos van sueltos (sin grupos) y abre la ficha. Si los filtros lo esconden, los quita. */
+/** Acerca hasta que el proyecto sale de su grupo (zoom 16) y abre la ficha. Si los filtros lo esconden, los quita. */
 function abrirProyecto(id) {
   if (!M.map || !S.d) return;
   if (!M.marcas[id]) {
@@ -715,15 +717,17 @@ function abrirProyecto(id) {
 function pintarLeyenda() {
   const el = $('leyenda'); el.dataset.open = String(!!S.leyenda);
   el.innerHTML = `<button type="button" aria-expanded="${!!S.leyenda}">Leyenda ${IC.flecha}</button><div class="cuerpo">
-    <div class="lbl">Color = estado</div>
-    ${ESTADOS.slice(0, 4).map(e => `<div class="lg"><i class="e-${e.k}" style="border:0;box-shadow:none"></i>${e.n}</div>`).join('')}
-    <div class="lg"><span class="mk ax" style="width:18px;height:18px;border-width:2px;border-color:var(--muted)"></span>Ubicación aproximada</div>
-    <div class="lg-sep"></div><div class="lbl">Ícono = tipo de proyecto</div>
+    <div class="lbl">Ícono = tipo de proyecto</div>
     ${['vertical', 'casa', 'industria', 'vial', 'otro'].map(k => `<div class="lg">${icoSeg(k, 20)}${SEG_N[k]}</div>`).join('')}
+    <div class="lg-sep"></div><div class="lbl">Punto = estado</div>
+    ${ESTADOS.slice(0, 4).map(e => `<div class="lg"><span class="lg-pt" style="--c:var(--mapa-${e.k})"></span>${e.n}</div>`).join('')}
+    <div class="lg"><span class="lg-pt ax" style="--c:var(--muted)"></span>Ubicación aproximada (punto hueco)</div>
+    <div class="lg-sep"></div><div class="lbl">Número = proyectos agrupados</div>
+    <div class="lg lg-grupo">${grupoSvg('vertical', 12)}<span>Varios proyectos cercanos; toque para acercar</span></div>
     <div class="lg-sep"></div>
     <div class="lg"><span class="pl" style="background:var(--orange);border-radius:50%">${GLIFO.concreto}</span>Planta Duracreto</div>
     <div class="lg">${Object.keys(COLOR_NEG).map(k => `<span class="pl" style="background:#fff;border:1.5px solid #8A8A85" title="${NEGOCIO_N[k]}">${glifo(k, COLOR_NEG[k])}</span>`).join('')}Competencia</div>
-    <div class="lg" style="color:var(--muted);font-size:10.5px">Lejos, el estado es el borde del círculo; de cerca, el punto junto al ícono. Los números agrupan proyectos cercanos.</div></div>`;
+    </div>`;
   el.querySelector('button').onclick = () => { S.leyenda = !S.leyenda; guardarPref(); pintarLeyenda(); };
 }
 
