@@ -1,1 +1,278 @@
-/* Estilos del módulo precios. Usar siempre el prefijo .precios- para no chocar con otros módulos. */
+/* Duracreto MarketView — estilos del módulo Estudio de precios (chat Estudio de precios).
+ * Todo va bajo .precios-raiz para no chocar con otros módulos. Usa las variables de core.css (--bg --surface --surface2 --fg
+ * --muted --line --yellow --orange …) y define solo las propias del estudio (--p-…, colores de posición y de la gráfica). */
+.precios-raiz{
+  --p-ink:var(--fg); --p-bar:#12130F; --p-bar-ink:#F2F2EE; --p-on-yellow:#12130F; --p-r:10px;
+  --p-num:'IBM Plex Mono',ui-monospace,Consolas,monospace;
+  --above:#B42318; --above-bg:#FDECEA; --below:#1D5FA8; --below-bg:#E7F0FB; --par:#5A5A56; --par-bg:#EDEDEA;
+  --c1:#12130F; --c2:#1D5FA8; --c3:#7A4FB3; --c4:#0F8A7E; --c5:#B0306A; --c6:#8A6D1F; --c7:#4F6B2A; --c8:#9A9A95;
+  min-height:100%; color:var(--fg); font-family:var(--font); font-size:14px; line-height:1.45;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .precios-raiz{
+  --above:#FF8A7A; --above-bg:#3A1C18; --below:#7DB3F0; --below-bg:#16273D; --par:#B8B8B3; --par-bg:#2A2A27;
+  --c1:#E8E8E4; --c2:#7DB3F0; --c3:#B79AE6; --c4:#4FC7B9; --c5:#EE86B5; --c6:#D9B95A; --c7:#9CC46A; --c8:#8E8E89}}
+:root[data-theme="dark"] .precios-raiz{
+  --above:#FF8A7A; --above-bg:#3A1C18; --below:#7DB3F0; --below-bg:#16273D; --par:#B8B8B3; --par-bg:#2A2A27;
+  --c1:#E8E8E4; --c2:#7DB3F0; --c3:#B79AE6; --c4:#4FC7B9; --c5:#EE86B5; --c6:#D9B95A; --c7:#9CC46A; --c8:#8E8E89}
+
+/* Pestañas de las secciones (reemplazan la barra negra del estudio viejo) */
+.precios-raiz .precios-tabs{position:sticky;top:0;z-index:6;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;background:var(--surface);border-bottom:1px solid var(--line);padding:0 12px}
+.precios-raiz .precios-tabs::-webkit-scrollbar{display:none}
+.precios-raiz .precios-tabs button{flex:none;background:none;border:0;border-bottom:3px solid transparent;padding:14px 12px 11px;font-weight:500;font-size:13px;color:var(--muted);white-space:nowrap}
+.precios-raiz .precios-tabs button:hover{color:var(--fg)}
+.precios-raiz .precios-tabs button[aria-current="page"]{color:var(--fg);font-weight:600;border-bottom-color:var(--yellow)}
+.precios-raiz .precios-tabs button:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+@media (min-width:1024px){.precios-raiz .precios-tabs{padding:0 20px}}
+
+.precios-raiz button,.precios-raiz input,.precios-raiz select,.precios-raiz textarea{font:inherit;color:inherit}
+.precios-raiz .num{font-family:var(--p-num);font-variant-numeric:tabular-nums}
+.precios-raiz h1,.precios-raiz h2,.precios-raiz h3{text-wrap:balance;margin:0}
+
+.precios-raiz .precios-main{max-width:1400px;margin:0 auto;padding-inline:16px;padding-block:22px 60px;display:flex;flex-direction:column;gap:18px}
+.precios-raiz .head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.precios-raiz .head h1{font-size:22px;font-weight:700}
+.precios-raiz .head p{margin:2px 0 0;color:var(--muted);max-width:70ch}
+.precios-raiz .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--p-r);min-width:0}
+.precios-raiz .panel-h{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.precios-raiz .panel-h h2{font-size:15px;font-weight:600}
+.precios-raiz .panel-b{padding:16px}
+
+/* Filtros */
+
+.precios-raiz .filters{display:flex;flex-wrap:wrap;gap:14px 18px;align-items:flex-end}
+.precios-raiz .fld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.precios-raiz .fld>label,.precios-raiz .lbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.precios-raiz select,.precios-raiz input[type=text],.precios-raiz input[type=number],.precios-raiz input[type=date],.precios-raiz textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:38px;max-width:100%}
+.precios-raiz textarea{min-height:90px;resize:vertical;width:100%}
+.precios-raiz select:focus,.precios-raiz input:focus,.precios-raiz textarea:focus{outline:2px solid var(--yellow);outline-offset:0;border-color:transparent}
+.precios-raiz .seg{display:inline-flex;background:var(--surface2);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;flex-wrap:wrap}
+.precios-raiz .seg button{border:0;background:none;padding:6px 12px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted)}
+.precios-raiz .seg button[aria-pressed="true"]{background:var(--yellow);color:var(--p-on-yellow);font-weight:600}
+.precios-raiz .seg button:focus-visible{outline:2px solid var(--orange)}
+.precios-raiz .seg small{display:block;font-size:10px;font-weight:400;opacity:.8}
+
+.precios-raiz .btn{border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:500;min-height:38px;display:inline-flex;align-items:center;gap:6px}
+.precios-raiz .btn:hover{border-color:var(--p-ink)}
+.precios-raiz .btn.primary{background:var(--yellow);border-color:var(--yellow);color:var(--p-on-yellow);font-weight:600}
+.precios-raiz .btn.primary:hover{background:var(--orange);border-color:var(--orange)}
+.precios-raiz .btn.ghost{border-color:transparent;background:none}
+.precios-raiz .btn.danger{color:var(--above)}
+.precios-raiz .btn:disabled{opacity:.45;cursor:not-allowed}
+.precios-raiz .btn:focus-visible{outline:2px solid var(--orange);outline-offset:1px}
+.precios-raiz .icon-btn{border:1px solid var(--line);background:var(--surface);width:30px;height:30px;border-radius:7px;cursor:pointer;display:inline-grid;place-items:center;font-size:12px}
+.precios-raiz .icon-btn:hover{border-color:var(--p-ink)}
+.precios-raiz .row-acts{display:inline-flex;gap:6px}
+/* Comparador en computadora: competidores con el mismo ancho y nombres en varias líneas */
+
+@media (min-width:900px){
+  .precios-raiz table.cmp-t{table-layout:fixed;min-width:calc(650px + var(--ncomp) * 112px)}
+  .precios-raiz table.cmp-t col.c-prod{width:220px} .precios-raiz table.cmp-t col.c-own{width:130px} .precios-raiz table.cmp-t col.c-avg{width:130px} .precios-raiz table.cmp-t col.c-pos{width:170px}
+  .precios-raiz table.cmp-t thead th{white-space:normal;overflow-wrap:break-word;vertical-align:bottom;line-height:1.3}
+  .precios-raiz table.cmp-t td{white-space:normal}
+  .precios-raiz table.cmp-t td.r .cell-price{white-space:nowrap}
+}
+/* Condiciones especiales del registro */
+
+.precios-raiz .conds{display:flex;flex-direction:column;gap:10px}
+.precios-raiz .cond{border:1px solid var(--line);border-radius:10px;padding:8px 14px;background:var(--surface)}
+.precios-raiz .cond.on{border-color:color-mix(in srgb,var(--yellow) 70%,var(--line));background:color-mix(in srgb,var(--yellow) 6%,var(--surface))}
+.precios-raiz .cond-b{display:flex;flex-direction:column;gap:12px;padding:6px 0 10px}
+.precios-raiz .cond-b.form-grid{display:grid}
+.precios-raiz .lugar-row{display:flex;gap:8px;flex-wrap:wrap}.precios-raiz .lugar-row input{flex:1;min-width:200px}
+.precios-raiz .sug-list{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;margin-top:6px;overflow:hidden;background:var(--surface)}
+.precios-raiz .sug{text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--p-ink)}
+.precios-raiz .sug:last-child{border-bottom:0}.precios-raiz .sug:hover,.precios-raiz .sug:focus-visible{background:var(--surface2)}
+.precios-raiz .sug-list .note{padding:10px 12px}
+.precios-raiz .dist-box{border-radius:8px;padding:10px 12px;font-size:13px;background:var(--surface2);border:1px solid var(--line);line-height:1.6}
+.precios-raiz .dist-box.ok{background:color-mix(in srgb,#2E7D32 10%,var(--surface));border-color:color-mix(in srgb,#2E7D32 40%,var(--line))}
+.precios-raiz .dist-box.warn{color:var(--above)}
+.precios-raiz #precios-mapa-modal .scrim{z-index:60}
+.precios-raiz .precios-mapabox{position:fixed;inset:5vh 5vw;z-index:61;background:var(--surface);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.precios-raiz .precios-mapah,.precios-raiz .precios-mapaf{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 16px}
+.precios-raiz .precios-mapah h2{margin:0 0 2px;font-size:17px}
+.precios-raiz .precios-mapacont{flex:1;min-height:280px;background:var(--surface2)}
+@media (max-width:640px){.precios-raiz .precios-mapabox{inset:0;border-radius:0}}
+/* Historial: una tarjeta por cotización */
+
+.precios-raiz .cot-list{display:flex;flex-direction:column;gap:14px;padding:14px}
+.precios-raiz .cot-card{border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.precios-raiz .cot-h{position:relative;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 34px 12px 14px;background:var(--surface2);border-bottom:1px solid var(--line)}
+.precios-raiz .info-i{position:absolute;top:8px;right:8px;z-index:2}
+.precios-raiz .info-i summary{list-style:none;cursor:pointer;width:18px;height:18px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font:600 11px/1 var(--font);color:var(--muted);font-style:italic;background:var(--surface)}
+.precios-raiz .info-i summary::-webkit-details-marker{display:none}
+.precios-raiz .info-i summary:hover,.precios-raiz .info-i[open] summary{border-color:var(--p-ink);color:var(--p-ink)}
+.precios-raiz .info-i span{position:absolute;right:0;top:24px;white-space:nowrap;background:var(--p-ink);color:var(--surface);font-size:12px;padding:6px 10px;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.precios-raiz .cot-main h3{margin:2px 0;font-size:15px}
+.precios-raiz .cot-main,.precios-raiz .cot-meta{display:flex;flex-direction:column;gap:2px;font-size:13px}
+.precios-raiz .cot-meta{text-align:right;align-items:flex-end}
+.precios-raiz .cot-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.precios-raiz .cot-t td,.precios-raiz .cot-t th{white-space:normal}
+.precios-raiz .cot-t td.r,.precios-raiz .cot-t th.r{white-space:nowrap}
+.precios-raiz .cot-t tr.extra td{background:color-mix(in srgb,var(--yellow) 5%,var(--surface))}
+.precios-raiz .cot-t tfoot td{border-bottom:0;background:var(--surface2)}
+.precios-raiz .cot-t td.acts{width:84px}
+.precios-raiz .cot-notas{margin:0;padding:10px 14px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line)}
+@media (max-width:640px){.precios-raiz .cot-meta{text-align:left;align-items:flex-start}}
+.precios-raiz .edit-form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.precios-raiz .edit-form .wide{grid-column:1/-1}
+@media (max-width:560px){.precios-raiz .edit-form{grid-template-columns:1fr}}
+
+/* KPIs */
+
+.precios-raiz .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.precios-raiz .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--p-r);padding:14px 16px}
+.precios-raiz .kpi .v{font-size:24px;font-weight:700;margin-top:4px}
+.precios-raiz .kpi .s{font-size:12px;color:var(--muted)}
+
+/* Tablas */
+
+.precios-raiz .tbl-wrap{overflow-x:auto}
+.precios-raiz table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
+.precios-raiz th,.precios-raiz td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:nowrap}
+.precios-raiz thead th{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--surface2);position:sticky;top:0}
+.precios-raiz tbody tr:hover td{background:var(--surface2)}
+.precios-raiz td.r,.precios-raiz th.r{text-align:right}
+/* Historial en computadora: columnas ajustadas para verlo todo sin desplazarse de lado */
+
+@media (min-width:1100px){
+  .precios-raiz table.hist{table-layout:fixed}
+  .precios-raiz table.hist th,.precios-raiz table.hist td{white-space:normal;overflow-wrap:break-word;padding:9px 8px}
+  .precios-raiz table.hist td.r,.precios-raiz table.hist th.r{white-space:nowrap}
+  .precios-raiz table.hist th:nth-child(1){width:96px} .precios-raiz table.hist th:nth-child(2){width:16%} .precios-raiz table.hist th:nth-child(3){width:14%}
+  .precios-raiz table.hist td:nth-child(1){white-space:nowrap}
+  .precios-raiz table.hist th:nth-child(4){width:70px} .precios-raiz table.hist th:nth-child(5){width:96px} .precios-raiz table.hist th:nth-child(6){width:100px}
+  .precios-raiz table.hist th:nth-child(8){width:92px} .precios-raiz table.hist th:nth-child(9){width:108px} .precios-raiz table.hist th:nth-child(10){width:84px}
+  .precios-raiz table.hist .cell-price{font-size:13px}
+}
+.precios-raiz .sticky-c{position:sticky;left:0;background:var(--surface);z-index:1;border-right:1px solid var(--line)}
+.precios-raiz thead .sticky-c{background:var(--surface2);z-index:2}
+.precios-raiz tbody tr:hover .sticky-c{background:var(--surface2)}
+.precios-raiz .own-col{background:color-mix(in srgb,var(--yellow) 10%,var(--surface))}
+.precios-raiz thead .own-col{background:color-mix(in srgb,var(--yellow) 28%,var(--surface2));color:var(--p-ink)}
+.precios-raiz .prod b{font-weight:600}
+.precios-raiz .prod small,.precios-raiz .sub{display:block;color:var(--muted);font-size:11.5px}
+.precios-raiz .fam-row td{background:var(--surface2);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;color:var(--muted);padding-block:6px}
+.precios-raiz .cell-price{font-family:var(--p-num);font-weight:500;font-size:13.5px}
+.precios-raiz .chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:2px 7px;border-radius:20px;font-family:var(--p-num)}
+.precios-raiz .chip.above{background:var(--above-bg);color:var(--above)}
+.precios-raiz .chip.below{background:var(--below-bg);color:var(--below)}
+.precios-raiz .chip.par{background:var(--par-bg);color:var(--par)}
+.precios-raiz .tag{display:inline-block;font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:4px;background:var(--par-bg);color:var(--par);letter-spacing:.03em}
+.precios-raiz .tag.own{background:var(--yellow);color:var(--p-on-yellow)}
+.precios-raiz .tag.warn{background:color-mix(in srgb,var(--orange) 18%,var(--surface));color:var(--orange)}
+.precios-raiz .row-click{cursor:pointer}
+.precios-raiz .dim{color:var(--muted)}
+.precios-raiz .empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.precios-raiz .empty h3{color:var(--p-ink);font-size:16px;margin-bottom:6px}
+.precios-raiz .empty .btn{margin-top:14px}
+
+/* Formularios */
+
+.precios-raiz .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px 18px}
+.precios-raiz .form-grid .wide{grid-column:1/-1}
+.precios-raiz .form-grid select,.precios-raiz .form-grid input{width:100%}
+.precios-raiz .form-grid input[type=checkbox]{width:auto;min-height:0}
+.precios-raiz .check{display:flex;gap:8px;align-items:center;font-size:13px;min-height:38px}
+.precios-raiz .note{font-size:12px;color:var(--muted)}
+.precios-raiz .hint-box{background:var(--surface2);border:1px dashed var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--muted)}
+.precios-raiz .two{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px}
+@media (max-width:900px){.precios-raiz .two{grid-template-columns:1fr}}
+.precios-raiz .price-in{width:110px;text-align:right;font-family:var(--p-num)}
+.precios-raiz .changed{outline:2px solid var(--orange)!important}
+
+/* Drawer */
+
+.precios-raiz .scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:40}
+.precios-raiz .drawer{position:fixed;top:0;right:0;bottom:0;width:min(640px,100%);background:var(--surface);z-index:41;overflow-y:auto;border-left:1px solid var(--line);padding:calc(env(safe-area-inset-top,0px) + 18px) 18px 30px;display:flex;flex-direction:column;gap:16px}
+.precios-raiz .drawer h2{font-size:18px}
+.precios-raiz .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px}
+.precios-raiz .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.precios-raiz svg text{fill:var(--muted);font-family:var(--p-num);font-size:10px}
+.precios-raiz .subtabs{display:flex;gap:6px;flex-wrap:wrap}
+.precios-raiz .confirm{display:inline-flex;gap:6px;align-items:center;font-size:12px}
+.precios-raiz .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:6px}
+.precios-raiz .status-dot.on{background:#2FA35F}
+
+.precios-raiz .err{color:var(--above);font-size:12px;font-weight:500}
+/* Registro */
+
+.precios-raiz .reg-wrap{max-width:780px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.precios-raiz .req{color:var(--orange)}
+.precios-raiz .cat-chip{display:flex;align-items:center;gap:8px;min-height:38px;padding:6px 12px;border-radius:8px;background:var(--surface2);border:1px dashed var(--line);font-size:13px}
+.precios-raiz .cat-chip b{font-weight:600}
+.precios-raiz .file-box{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px dashed var(--line);border-radius:8px;background:var(--surface2)}
+.precios-raiz .file-box input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+.precios-raiz .file-box .fname{font-weight:500;word-break:break-all}
+.precios-raiz .bad{border-color:var(--above)!important}
+.precios-raiz .badge{position:absolute;top:-4px;right:-4px;min-width:20px;height:20px;border-radius:10px;background:var(--above);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 5px}
+.precios-raiz .btn .badge{position:static;margin-left:4px;background:var(--orange)}
+.precios-raiz .feed{display:flex;flex-direction:column}
+.precios-raiz .feed-item{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.precios-raiz .feed-item:last-child{border-bottom:0}
+.precios-raiz .items{display:flex;flex-direction:column;gap:12px}
+.precios-raiz .item-card{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface2);display:flex;flex-direction:column;gap:10px}
+.precios-raiz .item-h{display:flex;justify-content:space-between;align-items:center;min-height:30px}
+.precios-raiz .item-card select,.precios-raiz .item-card input{background:var(--surface)}
+/* Chat */
+
+.precios-raiz .chat-fab{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);width:60px;height:60px;border-radius:50%;border:3px solid var(--yellow);background:var(--surface);padding:0;cursor:pointer;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.22)}
+.precios-raiz .chat-fab svg{width:100%;height:100%;border-radius:50%;display:block}
+.precios-raiz .chat-hola{position:fixed;right:90px;bottom:calc(env(safe-area-inset-bottom,0px) + 36px);z-index:40;background:var(--surface);color:var(--p-ink);border:1px solid var(--line);border-radius:14px 14px 4px 14px;padding:5px 12px;font:600 12.5px var(--font);box-shadow:0 4px 14px rgba(0,0,0,.12);cursor:pointer;animation:precios-hola-in .5s ease-out .8s both,precios-hola-flota 3.2s ease-in-out 1.3s infinite}
+.precios-raiz .chat-hola:hover{border-color:var(--yellow)}
+@keyframes precios-hola-in{from{opacity:0;transform:translateX(8px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes precios-hola-flota{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@media (max-width:480px){.precios-raiz .chat-hola{right:86px}}
+.precios-raiz .chat-fab:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+.precios-raiz .chat-panel{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);width:min(370px,calc(100vw - 32px));height:min(540px,calc(100vh - 140px));background:var(--surface);border:1px solid var(--line);border-radius:14px;z-index:51;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.28)}
+@media (max-width:480px){.precios-raiz .chat-panel{right:16px}.precios-raiz .chat-fab{right:16px}}
+.precios-raiz .chat-h{background:var(--p-bar);color:var(--p-bar-ink);padding:12px 14px;display:flex;align-items:center;gap:10px;border-bottom:3px solid var(--yellow)}
+.precios-raiz .chat-h .av{width:38px;height:38px;flex:none}
+.precios-raiz .chat-h .av svg{width:100%;height:100%;border-radius:50%}
+.precios-raiz .chat-h b{display:block;font-size:14px}
+.precios-raiz .chat-h small{color:#A0A19F;font-size:11.5px}
+.precios-raiz .chat-h button{margin-left:auto;background:none;border:0;color:#ddd;font-size:18px;cursor:pointer;padding:4px 8px}
+.precios-raiz .chat-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.precios-raiz .msg{max-width:82%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}
+.precios-raiz .msg.them{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.precios-raiz .msg.me{align-self:flex-end;background:var(--yellow);color:var(--p-on-yellow);border-bottom-right-radius:4px}
+.precios-raiz .msg time{display:block;font-size:10px;opacity:.6;margin-top:3px}
+.precios-raiz .chat-f{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line);background:var(--surface)}
+.precios-raiz .chat-f textarea{min-height:40px;max-height:110px;flex:1;resize:none;font-size:13px}
+.precios-raiz .chat-f button{flex:none}
+.precios-raiz .thread{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;background:var(--surface)}
+.precios-raiz .thread:hover{background:var(--surface2)}
+.precios-raiz .thread .dot{width:9px;height:9px;border-radius:50%;background:var(--orange);margin-top:6px;flex:none}
+.precios-raiz .thread .dot.off{background:transparent}
+.precios-raiz .thread small{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px}
+@media (max-width:640px){.precios-raiz .head h1{font-size:19px}}
+@media (prefers-reduced-motion:reduce){.precios-raiz .chat-hola{animation:none}}
+/* ---- Ajustes para el cascarón de MarketView ---- */
+/* Capas: encabezado y menú del cascarón = 40; menú de usuario = 60; avisos = 70. */
+.precios-raiz .scrim{z-index:50}
+.precios-raiz .drawer{z-index:51}
+.precios-raiz .chat-hola{z-index:52}
+.precios-raiz .chat-fab{z-index:53}
+.precios-raiz .chat-panel{z-index:54}
+.precios-raiz #precios-mapa-modal .scrim{z-index:56}
+.precios-raiz .precios-mapabox{z-index:57}
+.precios-raiz .mv-pronto p{color:var(--muted);margin:10px 0 0}
+/* El área de módulos (#mv-main) es fija y forma su propia capa debajo del encabezado y del menú del cascarón:
+   los paneles flotantes empiezan bajo el encabezado (--top-h) y, en el celular, terminan sobre el menú inferior (--nav-h). */
+.precios-raiz .scrim{top:var(--top-h)}
+.precios-raiz .drawer{top:var(--top-h);padding-top:18px}
+.precios-raiz .precios-mapabox{inset:calc(var(--top-h) + 2vh) 4vw 3vh}
+.precios-raiz .chat-panel{height:min(540px,calc(100dvh - var(--top-h) - 120px))}
+/* Celular: el menú de módulos del cascarón va abajo (alto --nav-h); el chat se sube para no taparlo. */
+@media (max-width:1023.98px){
+  .precios-raiz .precios-main{padding-inline:12px;padding-block:16px 110px}
+  .precios-raiz .chat-fab{bottom:calc(var(--nav-h) + 14px);width:54px;height:54px}
+  .precios-raiz .chat-hola{bottom:calc(var(--nav-h) + 28px);right:80px}
+  .precios-raiz .chat-panel{bottom:calc(var(--nav-h) + 80px);height:min(540px,calc(100dvh - var(--top-h) - var(--nav-h) - 96px))}
+  #mv-main.sin-nav .precios-raiz .chat-fab{bottom:calc(var(--safe-b) + 16px)}
+  #mv-main.sin-nav .precios-raiz .chat-hola{bottom:calc(var(--safe-b) + 30px)}
+  #mv-main.sin-nav .precios-raiz .chat-panel{bottom:calc(var(--safe-b) + 82px)}
+  .precios-raiz .scrim,.precios-raiz .drawer{bottom:var(--nav-h)}
+  .precios-raiz .precios-mapabox{inset:var(--top-h) 0 var(--nav-h);border-radius:0}
+  #mv-main.sin-nav .precios-raiz .scrim,#mv-main.sin-nav .precios-raiz .drawer{bottom:0}
+  #mv-main.sin-nav .precios-raiz .precios-mapabox{bottom:0}
+}

@@ -14,12 +14,14 @@
  *     });
  *   ctx = { usuario, rol, modulo, api(accion, args), aviso(texto, tipo), abrir(modulo, params), params, tema(), esCelular() }
  *     ctx.api('mapa.cargar', {...}) → Promise con «data». Si falla, el error trae .codigo ('red'|'permiso'|'servidor'|'accion').
+ *     Espera hasta 60 s; las acciones cuyo nombre empieza con «subir» (ej. precios.subirAnexo) esperan 300 s.
+ *     Otro tiempo: ctx.api('precios.exportar', args, { tiempo: 120 }).
  *   Cambio de tema: window.addEventListener('mv:tema', e => e.detail.tema)  ('light' | 'dark').
  *   Todo lo del módulo va con prefijo propio (.mapa-…, precios…) y sin variables globales sueltas.
  */
 (function () {
   'use strict';
-  const VERSION = '1.1.0';              // súbala junto con VERSION en sw.js cada vez que publique cambios
+  const VERSION = '1.2.0';              // súbala junto con VERSION en sw.js cada vez que publique cambios
   const API_URL = String(window.API_URL || '').trim();
   const DEMO = !API_URL;
   const K = { ses: 'mv_sesion', mod: 'mv_modulo', tema: 'mv_tema', tip: 'mv_tip_instalar' };
@@ -68,10 +70,12 @@
   const temaActual = () => document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 
   /* ===================== Servidor ===================== */
-  async function api(accion, args) {
+  // opts.tiempo = segundos de espera (por defecto 60; las acciones que suben archivos, «…subir…», esperan 300).
+  async function api(accion, args, opts) {
     if (DEMO) return demoApi(accion, args || {});
     const cuerpo = JSON.stringify({ action: accion, token: S && S.token, args: args || {} });
-    const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), 60000);
+    const seg = (opts && opts.tiempo) || (/\.subir/i.test(accion) ? 300 : 60);
+    const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), seg * 1000);
     let r, j;
     try {
       // Sin encabezados: el navegador lo envía como texto simple y Apps Script no necesita permisos especiales (CORS).
