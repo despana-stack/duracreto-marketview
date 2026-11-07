@@ -110,6 +110,13 @@ function grupoSvg(sk, n) {
 }
 const COLOR_NEG = { concreto: '#1D5FA8', agregados: '#8A6D1F', bloques: '#C2410C', prefabricados: '#0F766E', cemento: '#5E5E5A' };
 const glifo = (k, color) => (GLIFO[k] || GLIFO.concreto).replace(/#fff/g, color);
+/* Planta (mapa, panel, buscador y leyenda): glifo del negocio suelto, sin fondo.
+   Duracreto = naranja con halo amarillo y contorno blanco; competencia = color de su negocio con contorno blanco. */
+const NARANJA_PLANTA = '#F07800';
+function plantaSvg(propia, neg, w) {
+  const color = propia ? NARANJA_PLANTA : (COLOR_NEG[neg] || '#5E5E5A');
+  return `<span class="pl-s ${propia ? 'propia' : 'comp'}" style="--w:${w}px">${glifo(neg || 'concreto', color)}</span>`;
+}
 const RADIO_KM = 20;
 const NEGOCIO_N = { concreto: 'Concreto', agregados: 'Agregados', bloques: 'Bloques', prefabricados: 'Prefabricados', cemento: 'Cemento' };
 const PALETA = ['#7B2FFF', '#00B4D8', '#E91E63', '#2DCB75', '#FF6D00', '#0077FF', '#C084FC', '#FF2200', '#F5C400', '#00C060'];
@@ -294,8 +301,8 @@ function dibujarPanel() {
       ${encabezado('plantas', 'Plantas', `(${plantasVisibles().length})`, 'plantas')}
       <div class="desp" ${S.ui.plantas ? '' : 'hidden'}>
         ${grupo('pl', 'Duracreto o competencia',
-          pill('pl', 'propia', `<span class="pt propia" style="width:18px;height:18px;border-width:1.5px;box-shadow:none">${GLIFO.concreto}</span>Duracreto`) +
-          pill('pl', 'comp', `<span class="pt comp" style="width:18px;height:18px;border-radius:5px;box-shadow:none">${glifo('concreto', '#5E5E5A')}</span>Competencia`))}
+          pill('pl', 'propia', plantaSvg(true, 'concreto', 18) + 'Duracreto') +
+          pill('pl', 'comp', plantaSvg(false, 'concreto', 18) + 'Competencia'))}
         ${grupo('neg', 'Tipo de planta', negs.map(n => pill('neg', n, glifo(n, COLOR_NEG[n]) + NEGOCIO_N[n])).join(''))}
         <p class="nota">Pase el mouse (o toque, en el celular) sobre una planta de concreto Duracreto para ver su radio de 20 km.</p>
       </div>
@@ -391,7 +398,7 @@ function sugerencias(txt) {
   if (total > 1) items.push(`<button type="button" class="sg todas" data-sug="todas" role="option">Ver todas las coincidencias<small>(${total})</small></button>`);
   pls.slice(0, 4).forEach(pl => {
     const propia = /propia/i.test(pl.tipo || ''), n = (pl.negocios || [])[0] || 'concreto';
-    items.push(`<button type="button" class="sg" data-sug-pl="${esc(pl.id)}" role="option">${propia ? `<span class="pt propia" style="width:22px;height:22px;flex:none;border-width:2px;box-shadow:none">${GLIFO[n] || GLIFO.concreto}</span>` : `<span class="pt comp" style="width:22px;height:22px;flex:none;border-radius:5px;box-shadow:none">${glifo(n, COLOR_NEG[n] || '#5E5E5A')}</span>`}<span><b>${esc(pl.nombre)}</b><small>Planta${pl.ciudad ? ' · ' + esc(pl.ciudad) : ''}</small></span></button>`);
+    items.push(`<button type="button" class="sg" data-sug-pl="${esc(pl.id)}" role="option">${plantaSvg(propia, n, propia ? 24 : 22)}<span><b>${esc(pl.nombre)}</b><small>Planta${pl.ciudad ? ' · ' + esc(pl.ciudad) : ''}</small></span></button>`);
   });
   pr.slice(0, 8).forEach(p => items.push(`<button type="button" class="sg" data-sug-p="${esc(p.id)}" role="option">${pinSvg(estadoK(p.estado), segK(p), esAprox(p), 24)}<span><b>${esc(p.proyecto || 'Sin nombre')}</b><small>${esc(p.cliente || '')}${p.asesor ? ' · ' + esc(p.asesor) : ''}</small></span></button>`));
   if (!items.length) items.push(`<p class="nota" style="padding:8px 12px">Sin coincidencias con los filtros actuales.</p>`);
@@ -588,9 +595,9 @@ function dibujarCapa(k) {
     plantasVisibles().forEach(pl => {
       const propia = /propia/i.test(pl.tipo || '');
       const negs = (pl.negocios || []), prim = negs.find(n => !selNeg.size || selNeg.has(n)) || negs[0] || 'concreto';
-      const html = propia ? `<div class="pt propia">${GLIFO[prim] || GLIFO.concreto}${negs.length > 1 ? `<b>${negs.length}</b>` : ''}</div>`
-        : `<div class="pt comp">${glifo(prim, COLOR_NEG[prim] || '#5E5E5A')}</div>`;
-      const m = L.marker([pl.lat, pl.lng], { pane: 'plantas', zIndexOffset: propia ? 900 : 700, icon: L.divIcon({ className: 'mc-sin-fondo', html, iconSize: propia ? [30, 30] : [24, 24], iconAnchor: propia ? [15, 15] : [12, 12], popupAnchor: [0, -12] }) });
+      // Sin número de negocios (el número ahora es de proyectos agrupados); los negocios se ven en la ficha.
+      const html = plantaSvg(propia, prim, propia ? 30 : 24);
+      const m = L.marker([pl.lat, pl.lng], { pane: 'plantas', zIndexOffset: propia ? 900 : 700, icon: L.divIcon({ className: 'mc-sin-fondo', html, iconSize: propia ? [30, 30] : [24, 24], iconAnchor: propia ? [15, 15] : [12, 12], popupAnchor: [0, -14] }) });
       if (propia) m.bindTooltip(esc(corto(pl.nombre).replace(/\s*DURACRETO\s*/i, ' ').replace(/^Planta de\s*/i, '').trim()), { permanent: true, direction: 'bottom', offset: [0, 12], className: 'lbl-planta' });
       else m.bindTooltip(esc(pl.nombre), { direction: 'top', offset: [0, -12], className: 'tt' });
       m.bindPopup(() => fichaPlanta(pl), { maxWidth: 300 });
@@ -725,8 +732,9 @@ function pintarLeyenda() {
     <div class="lg-sep"></div><div class="lbl">Número = proyectos agrupados</div>
     <div class="lg lg-grupo">${grupoSvg('vertical', 12)}<span>Varios proyectos cercanos; toque para acercar</span></div>
     <div class="lg-sep"></div>
-    <div class="lg"><span class="pl" style="background:var(--orange);border-radius:50%">${GLIFO.concreto}</span>Planta Duracreto</div>
-    <div class="lg">${Object.keys(COLOR_NEG).map(k => `<span class="pl" style="background:#fff;border:1.5px solid #8A8A85" title="${NEGOCIO_N[k]}">${glifo(k, COLOR_NEG[k])}</span>`).join('')}Competencia</div>
+    <div class="lbl">Plantas</div>
+    <div class="lg">${plantaSvg(true, 'concreto', 22)}Planta Duracreto (ícono naranja con halo)</div>
+    <div class="lg lg-comp"><span>${Object.keys(COLOR_NEG).map(k => `<span title="${NEGOCIO_N[k]}">${plantaSvg(false, k, 18)}</span>`).join('')}</span>Competencia (color de su negocio)</div>
     </div>`;
   el.querySelector('button').onclick = () => { S.leyenda = !S.leyenda; guardarPref(); pintarLeyenda(); };
 }
