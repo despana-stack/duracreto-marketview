@@ -23,10 +23,15 @@ const TEMP_ID = "srv-temp"; // control de temperatura: ya no se elige como produ
 const INICIO_DEF = "concreto|"+"Valle de Sula (SPS)|dc-duracreto-planta-santa-martha";
 const cfgN = (k,d) => { const v=Number(S.config?.[k]); return isFinite(v)&&v>0?v:d; };
 const TARIFA_KM = () => cfgN("recargoKm",6), RADIO_KM = () => cfgN("radioCobertura",20), PRECIO_BOLSA = () => cfgN("precioBolsa",110);
-const VISTAS = {editor:["comparar","registrar","historial","precios","catalogo"], consulta:["comparar","registrar","historial","precios","catalogo"], asesor:["comparar","registrar","historial"], visualizador:["comparar"]};
+/* Secciones por rol (12/11/2026). Lo confidencial lo filtra el servidor (Precios.gs); aquí solo se ordena la pantalla.
+   visualizador = dirección/IT: ve todo sin cambiar. area = gerente de un negocio: solo su negocio.
+   asesor = equipo comercial: registra y ve solo su propio historial (sin comparador). */
+const VISTAS = {editor:["comparar","registrar","historial","precios","catalogo"], consulta:["comparar","historial","precios","catalogo"], visualizador:["comparar","historial","precios","catalogo"], area:["comparar","historial","precios"], asesor:["registrar","historial"]};
+/** Negocios que esta persona puede ver (los que tienen productos en lo que mandó el servidor). */
+const negVis = () => { const v=NEG.filter(n=>(S.productos||[]).some(p=>p.negocio===n.k)); return v.length?v:NEG; };
 // Rol "consulta": ve todo como un editor, pero nada se guarda (solo el chat).
 const SIN_AUT = "No tienes autorización para hacer modificaciones.";
-const soloConsulta = () => S.me?.rol==="consulta";
+const soloConsulta = () => ["consulta","visualizador","area"].includes(S.me?.rol);   // ven, pero no guardan nada (salvo el chat)
 const CHAT_OWNER = "despana";
 const gestionaCot = () => S.me?.usuario===CHAT_OWNER || S.me?.coanfitrion===true;
 /* Servicio de construcción sin precio de servicio de Duracreto: se compara contra la lista normal + ISV y sí entra al comparador */
@@ -130,8 +135,9 @@ function render(){
   const app=document.getElementById("precios-app");
   if(!app||!S.ready||!S.me){ return; }
   const allowed=VISTAS[S.me.rol]||VISTAS.visualizador; if(!allowed.includes(S.view)) S.view=allowed[0];
+  { const nv=negVis().map(n=>n.k), d=nv[0]; ["f","reg","pr","cat"].forEach(k=>{ if(S[k]&&!nv.includes(S[k].neg)) S[k].neg=d; }); if(S.h.neg&&!nv.includes(S.h.neg)) S.h.neg=""; }
   const nav=document.getElementById("precios-nav"); nav.hidden=allowed.length<2;
-  nav.querySelectorAll("button").forEach(b=>{ b.hidden=!allowed.includes(b.dataset.view); b.setAttribute("aria-current", b.dataset.view===S.view?"page":"false"); });
+  nav.querySelectorAll("button").forEach(b=>{ b.hidden=!allowed.includes(b.dataset.view); if(b.dataset.view==="historial") b.textContent=S.me.rol==="asesor"?"Mi historial":"Historial"; b.setAttribute("aria-current", b.dataset.view===S.view?"page":"false"); });
   renderChat();
   const V={comparar:vComparar, registrar:vRegistrar, historial:vHistorial, precios:vPrecios, catalogo:vCatalogo}[S.view]||vComparar;
   app.innerHTML=V();
@@ -140,8 +146,8 @@ function render(){
 on("focusout",()=>setTimeout(()=>{ if(pendingRender){ const ae=document.activeElement; if(!(ae&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName))) render(); } },0));
 const rerender = () => { render.force=true; render(); };
 
-function segNeg(cur, act){ return `<div class="seg" role="group" aria-label="Negocio">${NEG.map(n=>`<button data-act="${act}" data-v="${n.k}" aria-pressed="${cur===n.k}">${n.l}</button>`).join("")}</div>`; }
-function readonlyNote(){ return S.canEdit?"":`<div class="hint-box">Solo los editores de la herramienta pueden modificar esta sección. Puedes consultarla y registrar cotizaciones de la competencia.</div>`; }
+function segNeg(cur, act){ return `<div class="seg" role="group" aria-label="Negocio">${negVis().map(n=>`<button data-act="${act}" data-v="${n.k}" aria-pressed="${cur===n.k}">${n.l}</button>`).join("")}</div>`; }
+function readonlyNote(){ return S.canEdit?"":`<div class="hint-box">Solo los editores de la herramienta pueden modificar esta sección. Puedes consultarla.</div>`; }
 
 /* ===== Comparador ===== */
 function vComparar(){
@@ -546,10 +552,10 @@ function vHistorial(){
   const h=S.h, list=filtHist(), grupos=agruparCot(list);
   const comps=[...new Set(S.plantas.filter(p=>p.tipo==="competencia"&&(!h.mercado||p.mercado===h.mercado)&&(!h.neg||(p.negocios||[]).includes(h.neg))).map(empresaDe))].sort((a,b)=>a.localeCompare(b,"es"));
   const prods=h.neg?prodsDe(h.neg):sortProds(S.productos);
-  return `<div class="head"><div><h1>Historial de cotizaciones</h1><p>Todas las cotizaciones de la competencia registradas por el equipo. Precios mostrados sin ISV.</p></div>
+  return `<div class="head"><div><h1>${S.me.rol==="asesor"?"Mi historial de cotizaciones":"Historial de cotizaciones"}</h1><p>${S.me.rol==="asesor"?"Las cotizaciones de la competencia que usted registró.":S.me.rol==="area"?"Cotizaciones de la competencia de su negocio.":"Todas las cotizaciones de la competencia registradas por el equipo."} Precios mostrados sin ISV.</p></div>
   ${S.dl?`<button class="btn" data-act="csv" ${list.length?"":"disabled"}>Descargar CSV</button>`:""}</div>
   <section class="panel"><div class="panel-b filters">
-    <div class="fld"><label for="precios-h-neg">Negocio</label><select id="precios-h-neg" data-bind="h.neg"><option value="">Todos</option>${NEG.map(n=>`<option value="${n.k}" ${h.neg===n.k?"selected":""}>${n.l}</option>`).join("")}</select></div>
+    <div class="fld"><label for="precios-h-neg">Negocio</label><select id="precios-h-neg" data-bind="h.neg"><option value="">Todos</option>${negVis().map(n=>`<option value="${n.k}" ${h.neg===n.k?"selected":""}>${n.l}</option>`).join("")}</select></div>
     <div class="fld"><label for="precios-h-merc">Mercado</label><select id="precios-h-merc" data-bind="h.mercado"><option value="">Todos</option>${allMercados().map(m=>`<option ${h.mercado===m?"selected":""}>${esc(m)}</option>`).join("")}</select></div>
     <div class="fld"><label for="precios-h-pl">Competidor</label><select id="precios-h-pl" data-bind="h.planta"><option value="">Todos</option>${comps.map(c=>`<option value="${esc(c)}" ${h.planta===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
     <div class="fld"><label for="precios-h-prod">Producto</label><select id="precios-h-prod" data-bind="h.prod"><option value="">Todos</option>${prods.map(p=>`<option value="${p.id}" ${h.prod===p.id?"selected":""}>${esc(p.nombre)}</option>`).join("")}</select></div>
@@ -886,11 +892,11 @@ async function exportCSV(){
 /* ---------- usuarios y sesión (el inicio de sesión lo hace el cascarón; aquí solo se arma S.me) ---------- */
 const nombreDe = u => (S.usuarios.find(x=>x.id===u)?.nombre)||"";
 const compNombre = (q,pl) => { const e=q.empresa||empresaDe(pl); return e==="Otros"&&q.competidorOtro?`Otros · ${q.competidorOtro}`:e; };
-const canRegistrar = () => !!S.me && (S.me.rol==="editor"||S.me.rol==="asesor"||S.me.rol==="consulta");
+const canRegistrar = () => !!S.me && (S.me.rol==="editor"||S.me.rol==="asesor");
 const puedeBorrar = c => gestionaCot();
 function startSession(rec){
   S.me={usuario:rec.id, nombre:rec.nombre, rol:rec.rol||"visualizador", cargo:rec.cargo||"", coanfitrion:rec.coanfitrion===true}; S.usuarios=S.usuarios.length?S.usuarios:[{id:rec.id,nombre:rec.nombre,rol:rec.rol,activo:true}];
-  S.canEdit=S.me.rol==="editor"||S.me.rol==="consulta"; S.drawer=null; S.recentOpen=false;
+  S.canEdit=S.me.rol==="editor"; S.drawer=null; S.recentOpen=false;
   // Selección inicial del comparador por persona (columna "inicio" de la pestaña Usuarios: negocio|mercado|planta)
   const [ni,mi,oi]=String(rec.inicio||INICIO_DEF).split("|"); if(NEGL[ni]){ S.f.neg=ni; S.reg.neg=ni; } S.f.mercado=mi||""; S.f.own=oi||""; S.reg.zona=""; S.regPref={m:mi||"", planta:oi||""};
   subscribeChat(); rerender();
@@ -1049,7 +1055,7 @@ function suscribir(){
 /** El rol o el permiso de coanfitrión pueden cambiar en la Hoja: se aplican sin volver a entrar. */
 function actualizarYo(me){
   if(!S.me) return startSession(me);
-  if(S.me.rol!==me.rol||S.me.coanfitrion!==(me.coanfitrion===true)){ S.me.rol=me.rol||"visualizador"; S.me.coanfitrion=me.coanfitrion===true; S.canEdit=S.me.rol==="editor"||S.me.rol==="consulta"; }
+  if(S.me.rol!==me.rol||S.me.coanfitrion!==(me.coanfitrion===true)){ S.me.rol=me.rol||"visualizador"; S.me.coanfitrion=me.coanfitrion===true; S.canEdit=S.me.rol==="editor"; }
 }
 /** Enlaces directos: #precios?vista=historial&negocio=bloques&mercado=…&planta=santa-martha */
 function aplicarParams(p){

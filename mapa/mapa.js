@@ -187,7 +187,8 @@ function aplicar(d, primera) {
   if (antes && antes.mapaBase !== d.mapaBase && !S.base) ponerBase();
   if (!antes || primera) {
     /* Por defecto cada asesor ve solo sus proyectos; MAPA_CFG.verTodo (Diego, Daniel, Jorge) ve todo. */
-    S.f.asesor = (!d.verTodo && d.miAsesor) ? d.miAsesor : '';
+    S.f.asesor = (!d.verTodo && !d.soloMios && d.miAsesor) ? d.miAsesor : '';
+    if (d.soloPlantas) { S.ui.extra = true; S.capas.calor = true; }
     d.asesores.forEach(a => { if (S.geoVis[a.nombre] === undefined) S.geoVis[a.nombre] = activo(a); });
   }
   if (M.map) dibujarTodo();
@@ -293,8 +294,8 @@ function dibujarPanel() {
   $('panel-scroll').innerHTML = `
     <div class="sec">
       ${grupo('pais', 'País', pill('pais', 'hn', 'Honduras') + pill('pais', 'sv', 'El Salvador'))}
-      <div class="buscar">${IC.buscar}<input type="search" id="mapa-q" placeholder="Buscar cliente, proyecto o planta" value="${esc(f.q)}" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="mapa-sug"><div id="mapa-sug" class="sug" role="listbox" hidden></div></div>
-      ${d.miAsesor ? `<div class="seg dos" role="group" aria-label="Qué proyectos ver"><button type="button" data-vista="mios" aria-pressed="${mio}">Mis proyectos</button><button type="button" data-vista="equipo" aria-pressed="${!f.asesor}">Todo el equipo</button></div>` : ''}
+      <div class="buscar">${IC.buscar}<input type="search" id="mapa-q" placeholder="${d.soloPlantas ? 'Buscar planta' : 'Buscar cliente, proyecto o planta'}" value="${esc(f.q)}" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="mapa-sug"><div id="mapa-sug" class="sug" role="listbox" hidden></div></div>
+      ${d.miAsesor && !d.soloMios && !d.soloPlantas ? `<div class="seg dos" role="group" aria-label="Qué proyectos ver"><button type="button" data-vista="mios" aria-pressed="${mio}">Mis proyectos</button><button type="button" data-vista="equipo" aria-pressed="${!f.asesor}">Todo el equipo</button></div>` : ''}
     </div>
 
     <div class="bloque">
@@ -308,7 +309,7 @@ function dibujarPanel() {
       </div>
     </div>
 
-    <div class="bloque">
+    ${d.soloPlantas ? '' : `<div class="bloque">
       ${encabezado('proy', 'Proyectos', '', 'proyectos')}
       <div class="desp" ${S.ui.proy ? '' : 'hidden'}>
         <div id="mapa-g-tipo"></div>
@@ -329,17 +330,17 @@ function dibujarPanel() {
         <button type="button" class="mas" data-accion="lista" aria-expanded="${S.ui.lista}">Lista de proyectos <span class="num" id="mapa-n-lista" style="color:var(--muted);font-weight:500"></span>${IC.flecha}</button>
         <div class="desp" id="mapa-lista" ${S.ui.lista ? '' : 'hidden'}></div>
       </div>
-    </div>
+    </div>`}
 
     <div class="bloque">
       ${encabezado('extra', 'Capas adicionales')}
       <div class="desp" ${S.ui.extra ? '' : 'hidden'}>
         <div>
         ${capaFila('calor', 'Calor de demanda (perspectiva)', '<svg viewBox="0 0 24 24"><defs><radialGradient id="mapa-gc"><stop offset="0" stop-color="#D93025"/><stop offset=".5" stop-color="#F07800"/><stop offset="1" stop-color="#F9C200" stop-opacity="0"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#mapa-gc)"/></svg>')}
-        ${capaFila('clientes', 'Clientes de bloques', '<span class="cb"></span>')}
-        ${capaFila('terrenos', 'Terrenos en evaluación', IC.bandera)}
-        ${capaFila('geocercas', 'Geocercas de asesores', '<svg viewBox="0 0 24 24" fill="#7B2FFF" fill-opacity=".18" stroke="#7B2FFF" stroke-width="2" stroke-dasharray="4 2"><path d="M3 8l6-5 11 4-1 11-10 3-6-6z"/></svg>')}
-        <div id="mapa-geo-lista"></div>
+        ${d.clientes.length ? capaFila('clientes', 'Clientes de bloques', '<span class="cb"></span>') : ''}
+        ${d.terrenos.length ? capaFila('terrenos', 'Terrenos en evaluación', IC.bandera) : ''}
+        ${!(d.editarGeocercas || d.asesores.some(a => a.geocerca)) ? '' : capaFila('geocercas', 'Geocercas de asesores', '<svg viewBox="0 0 24 24" fill="#7B2FFF" fill-opacity=".18" stroke="#7B2FFF" stroke-width="2" stroke-dasharray="4 2"><path d="M3 8l6-5 11 4-1 11-10 3-6-6z"/></svg>')}
+        ${d.editarGeocercas || d.asesores.some(a => a.geocerca) ? '<div id="mapa-geo-lista"></div>' : ''}
         </div>
       </div>
     </div>
@@ -617,9 +618,14 @@ function dibujarCapa(k) {
     if (M.calor) { map.removeLayer(M.calor); M.calor = null; }
     if (!S.capas.calor) return;
     if (!L.heatLayer) return;   // la librería es opcional; si no cargó, el aviso sale solo cuando la persona enciende la capa
-    const ps = filtrar().filter(p => estadoK(p.estado) === 'perspectiva' && p.lat != null);
-    const vols = ps.map(p => Number(p.vol) || 0).sort((a, b) => a - b), tope = vols[Math.floor(vols.length * .9)] || 1;
-    M.calor = L.heatLayer(ps.map(p => [p.lat, p.lng, Math.max(.15, Math.min(1, (Number(p.vol) || 0) / tope))]), { radius: 28, blur: 22, maxZoom: 13, minOpacity: .25, gradient: { .2: '#F9C200', .55: '#F07800', .85: '#D93025' } }).addTo(map);
+    let pts;
+    if (Array.isArray(S.d.calor)) pts = S.d.calor;   // gerente de área: celdas agregadas en el servidor, sin proyectos
+    else {
+      const ps = filtrar().filter(p => estadoK(p.estado) === 'perspectiva' && p.lat != null);
+      const vols = ps.map(p => Number(p.vol) || 0).sort((a, b) => a - b), tope = vols[Math.floor(vols.length * .9)] || 1;
+      pts = ps.map(p => [p.lat, p.lng, Math.max(.15, Math.min(1, (Number(p.vol) || 0) / tope))]);
+    }
+    M.calor = L.heatLayer(pts, { radius: 28, blur: 22, maxZoom: 13, minOpacity: .25, gradient: { .2: '#F9C200', .55: '#F07800', .85: '#D93025' } }).addTo(map);
     return;
   }
   if (k === 'geocercas') {

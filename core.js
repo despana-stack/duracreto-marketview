@@ -21,7 +21,7 @@
  */
 (function () {
   'use strict';
-  const VERSION = '1.6.0';              // súbala junto con VERSION en sw.js cada vez que publique cambios
+  const VERSION = '1.7.0';              // súbala junto con VERSION en sw.js cada vez que publique cambios
   const API_URL = String(window.API_URL || '').trim();
   const DEMO = !API_URL;
   const K = { ses: 'mv_sesion', mod: 'mv_modulo', tema: 'mv_tema', tip: 'mv_tip_instalar' };
@@ -42,6 +42,8 @@
     luna: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/></svg>',
     instalar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 7v7M9 11l3 3 3-3M10 18.5h4"/></svg>',
     actualizar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>',
+    sol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>',
+    persona: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.3-6 8-6s6.8 2 8 6"/></svg>',
     salir: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></svg>',
     ojo: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
     compartir: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px"><path d="M12 3v12M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>'
@@ -56,7 +58,7 @@
     { id: 'dashboard', nom: 'Dashboard', largo: 'Dashboard', dir: 'dashboard' }
   ];
   const MODX = Object.fromEntries(MODULOS.map(m => [m.id, m]));
-  const ROLES = { editor: 'Editor', asesor: 'Asesor', visualizador: 'Visualizador', consulta: 'Consulta' };
+  const ROLES = { editor: 'Editor', asesor: 'Asesor comercial', visualizador: 'Visualizador', area: 'Gerente de área', consulta: 'Visualizador' };
 
   let S = store.get(K.ses);             // { token, usuario: {id, nombre, cargo, correo, inicio, roles:{mapa:'editor',…}} }
   if (S && (!S.token || !S.usuario)) S = null;
@@ -65,6 +67,8 @@
   let actual = null, params = {};
 
   const misModulos = () => MODULOS.filter(m => S && S.usuario.roles && S.usuario.roles[m.id]);
+  /** Texto bajo el nombre en el encabezado (lo manda el servidor; si es una sesión vieja, se arma con los roles). */
+  const perfilDe = u => u.perfil || (Object.values(u.roles || {}).map(r => ROLES[r]).filter(Boolean)[0] || '');
   const iniciales = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('').toUpperCase();
   const esCelular = () => !matchMedia('(min-width:1024px)').matches;
   const temaActual = () => document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -176,12 +180,19 @@
         <nav class="mv-nav" id="mvNav" aria-label="Módulos" ${mods.length < 2 ? 'data-uno' : ''}>
           ${mods.map(m => `<button data-mod="${m.id}" title="${esc(m.largo)}"><span class="ic">${I[m.id] || I.mapa}</span><em>${esc(m.nom)}</em></button>`).join('')}
         </nav>
-        <div class="mv-top-acc"><button class="mv-yo" id="mvYo" aria-label="Menú de ${esc(S.usuario.nombre)}" aria-haspopup="true">${esc(iniciales(S.usuario.nombre))}</button></div>
+        <div class="mv-top-acc">
+          <button class="mv-quien" id="mvYo" aria-label="Menú de ${esc(S.usuario.nombre)}" aria-haspopup="true"><b>${esc(S.usuario.nombre)}</b><small>${esc(perfilDe(S.usuario))}</small></button>
+          <button class="mv-ib" id="mvRef" title="Actualizar" aria-label="Actualizar">${I.actualizar}</button>
+          <button class="mv-ib" id="mvTemaB" title="Modo oscuro" aria-label="Modo oscuro" aria-pressed="${temaActual() === 'dark'}">${I.luna}</button>
+          <button class="mv-ib mv-ib-yo" id="mvYoCel" aria-label="Menú de ${esc(S.usuario.nombre)}" aria-haspopup="true">${I.persona}</button>
+        </div>
       </header>
       <main id="mv-main" class="${mods.length < 2 && esCelular() ? 'sin-nav' : ''}"></main>`;
     if (mods.length < 2 && esCelular()) $('#mvNav').hidden = true;
     $('#mvNav').onclick = e => { const b = e.target.closest('[data-mod]'); if (b) irA(b.dataset.mod); };
-    $('#mvYo').onclick = abrirMenu;
+    $('#mvYo').onclick = abrirMenu; $('#mvYoCel').onclick = abrirMenu;
+    $('#mvTemaB').onclick = () => { cambiarTema(); $('#mvTemaB').setAttribute('aria-pressed', String(temaActual() === 'dark')); };
+    $('#mvRef').onclick = () => { $('#mvRef').classList.add('girando'); setTimeout(() => location.reload(), 150); };
     abrir(modDesdeHash() || store.get(K.mod) || mods[0].id);
     sugerirInstalar();
   }
@@ -296,6 +307,7 @@
     document.documentElement.dataset.theme = n;
     try { localStorage.setItem(K.tema, n); } catch (e) {}
     window.dispatchEvent(new CustomEvent('mv:tema', { detail: { tema: n } }));
+    const b = $('#mvTemaB'); if (b) b.setAttribute('aria-pressed', String(n === 'dark'));
   }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!document.documentElement.dataset.theme) window.dispatchEvent(new CustomEvent('mv:tema', { detail: { tema: temaActual() } })); });
 
