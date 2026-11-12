@@ -16,13 +16,14 @@
   --c1:#E8E8E4; --c2:#7DB3F0; --c3:#B79AE6; --c4:#4FC7B9; --c5:#EE86B5; --c6:#D9B95A; --c7:#9CC46A; --c8:#8E8E89}
 
 /* Pestañas de las secciones (reemplazan la barra negra del estudio viejo) */
-.precios-raiz .precios-tabs{position:sticky;top:0;z-index:6;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;background:var(--surface);border-bottom:1px solid var(--line);padding:0 12px}
+.precios-raiz .precios-tabs{position:sticky;top:0;z-index:6;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;background:var(--surface2);border-bottom:1px solid var(--line);box-shadow:0 2px 6px rgba(0,0,0,.06);padding:8px 12px}
 .precios-raiz .precios-tabs::-webkit-scrollbar{display:none}
-.precios-raiz .precios-tabs button{flex:none;background:none;border:0;border-bottom:3px solid transparent;padding:14px 12px 11px;font-weight:500;font-size:13px;color:var(--muted);white-space:nowrap}
-.precios-raiz .precios-tabs button:hover{color:var(--fg)}
-.precios-raiz .precios-tabs button[aria-current="page"]{color:var(--fg);font-weight:600;border-bottom-color:var(--yellow)}
-.precios-raiz .precios-tabs button:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
-@media (min-width:1024px){.precios-raiz .precios-tabs{padding:0 20px}}
+.precios-raiz .precios-tabs button{flex:none;display:inline-flex;align-items:center;gap:7px;min-height:40px;padding:9px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);font-size:14px;font-weight:600;white-space:nowrap}
+.precios-raiz .precios-tabs button svg{width:16px;height:16px;flex:none}
+.precios-raiz .precios-tabs button:hover{border-color:var(--muted)}
+.precios-raiz .precios-tabs button[aria-current="page"]{background:var(--yellow);color:var(--p-on-yellow);border-color:var(--yellow)}
+.precios-raiz .precios-tabs button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media (min-width:1024px){.precios-raiz .precios-tabs{padding:10px 20px}}
 
 .precios-raiz button,.precios-raiz input,.precios-raiz select,.precios-raiz textarea{font:inherit;color:inherit}
 .precios-raiz .num{font-family:var(--p-num);font-variant-numeric:tabular-nums}
@@ -119,14 +120,14 @@
 
 /* KPIs */
 
-.precios-raiz .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
-.precios-raiz .kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--p-r);padding:14px 16px}
-.precios-raiz .kpi .v{font-size:24px;font-weight:700;margin-top:4px}
-.precios-raiz .kpi .s{font-size:12px;color:var(--muted)}
 
 /* Tablas */
 
 .precios-raiz .tbl-wrap{overflow-x:auto}
+/* Comparador: la tabla desplaza en ambos sentidos dentro de su caja, así el encabezado (competidores) y la columna Producto quedan fijos */
+.precios-raiz .cmp-wrap{overflow:auto;max-height:calc(100dvh - var(--top-h) - var(--nav-h) - 120px);border-top:1px solid var(--line)}
+.precios-raiz .cmp-wrap thead th{position:sticky;top:0;z-index:3}
+.precios-raiz .cmp-wrap thead th.sticky-c{left:0;z-index:4}
 .precios-raiz table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px}
 .precios-raiz th,.precios-raiz td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;white-space:nowrap}
 .precios-raiz thead th{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--surface2);position:sticky;top:0}
@@ -265,6 +266,8 @@
 /* Celular: el menú de módulos del cascarón va abajo (alto --nav-h); el chat se sube para no taparlo. */
 @media (max-width:1023.98px){
   .precios-raiz .precios-main{padding-inline:12px;padding-block:16px 110px}
+  /* el margen inferior de 110 px (para el chat) y la barra de secciones (~57 px) no deben tapar el encabezado fijo de la tabla */
+  .precios-raiz .cmp-wrap{max-height:calc(100dvh - var(--top-h) - var(--nav-h) - 185px)}
   .precios-raiz .chat-fab{bottom:calc(var(--nav-h) + 14px);width:54px;height:54px}
   .precios-raiz .chat-hola{bottom:calc(var(--nav-h) + 28px);right:80px}
   .precios-raiz .chat-panel{bottom:calc(var(--nav-h) + 80px);height:min(540px,calc(100dvh - var(--top-h) - var(--nav-h) - 96px))}

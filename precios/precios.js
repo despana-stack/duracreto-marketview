@@ -157,10 +157,10 @@ function vComparar(){
   if(!owns.find(p=>p.id===f.own)) f.own = owns[0]?owns[0].id:"";
   const prods=prodsDe(neg), ts=tramosDe(neg), u=NEG.find(n=>n.k===neg).u; if(f.tramo>ts.length) f.tramo=1;
 
-  const rows=[]; let nOwn=0,nAbove=0,nBelow=0,sumD=0,nD=0,lastFam=null;
+  const rows=[]; let lastFam=null;
   for(const p of prods){
     if((p.familia||"")!==lastFam){ lastFam=p.familia||""; if(lastFam) rows.push(`<tr class="fam-row"><td class="sticky-c" colspan="1">${esc(lastFam)}</td><td colspan="${comps.length+3}"></td></tr>`); }
-    const rec=f.own?precioVigente(f.own,p.id):null, op=precioTramo(rec,f.tramo); const own=op.v; if(own!=null) nOwn++;
+    const rec=f.own?precioVigente(f.own,p.id):null, op=precioTramo(rec,f.tramo); const own=op.v;
     const vals=[]; const cells=comps.map(c=>{
       const r=ultimaCot(c.ids,p.id,f.tramo,f.ventana);
       if(!r) return `<td class="r dim">—</td>`;
@@ -169,7 +169,7 @@ function vComparar(){
     }).join("");
     const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null, mn=vals.length?Math.min(...vals):null;
     let pos="—";
-    if(own!=null&&avg!=null){ const d=(own-avg)/avg; sumD+=d; nD++; if(d>0.02)nAbove++; else if(d<-0.02)nBelow++;
+    if(own!=null&&avg!=null){
       const rank=[...vals,own].sort((a,b)=>a-b).indexOf(own)+1; pos=`${diffChip(own,avg)}<span class="sub">${rank}° de ${vals.length+1} (más barato = 1°)</span>`; }
     rows.push(`<tr class="row-click" data-act="open" data-id="${p.id}">
       <td class="sticky-c prod"><b>${esc(p.nombre)}</b><small>${esc([p.especificacion,p.unidad||u].filter(Boolean).join(" · "))}</small></td>
@@ -178,7 +178,6 @@ function vComparar(){
       <td class="r"><div class="cell-price">${money(avg)}</div><span class="sub">mín ${money(mn)}</span></td>
       <td class="r">${pos}</td></tr>`);
   }
-  const nQ=S.cotiz.filter(q=>{ if(fueraComp(q)) return false; const pl=plantaById(q.plantaId), pr=prodById(q.productoId); return pl&&pr&&pr.negocio===neg&&pl.mercado===f.mercado&&daysAgo(q.fecha)<=30;}).length;
 
   return `
   <div class="head"><div><h1>Comparador de precios</h1><p>Precio unitario sin ISV de Duracreto frente a la última cotización registrada de cada competidor en el mismo mercado y categoría de volumen.</p></div>
@@ -191,15 +190,9 @@ function vComparar(){
     <div class="fld"><label for="precios-f-vent">Antigüedad máx.</label><select id="precios-f-vent" data-bind="f.ventana" data-num>${[[90,"90 días"],[180,"6 meses"],[365,"12 meses"],[0,"Todo el histórico"]].map(([v,l])=>`<option value="${v}" ${f.ventana===v?"selected":""}>${l}</option>`).join("")}</select></div>
   </div></section>
   ${!f.own?`<div class="hint-box">No hay planta Duracreto registrada en <b>${esc(f.mercado)}</b> para ${esc(NEGL[neg])}. Se muestran solo competidores.</div>`:""}
-  <div class="kpis">
-    <div class="kpi"><span class="lbl">Productos con precio propio</span><div class="v num">${nOwn}<span class="dim" style="font-size:15px"> / ${prods.length}</span></div><span class="s">${esc(plantaById(f.own)?.nombre||"Sin planta propia")}</span></div>
-    <div class="kpi"><span class="lbl">Diferencia promedio vs. mercado</span><div class="v num">${nD?pct(sumD/nD):"—"}</div><span class="s">Positivo: Duracreto más caro</span></div>
-    <div class="kpi"><span class="lbl">Arriba / abajo del promedio</span><div class="v num"><span style="color:var(--above)">${nAbove}</span> <span class="dim">/</span> <span style="color:var(--below)">${nBelow}</span></div><span class="s">Productos fuera de ±2%</span></div>
-    <div class="kpi"><span class="lbl">Cotizaciones últimos 30 días</span><div class="v num">${nQ}</div><span class="s">${comps.length} competidores en el mercado</span></div>
-  </div>
   <section class="panel">
     <div class="panel-h"><h2>${esc(NEGL[neg])} · ${esc(f.mercado||"—")} · ${esc(ts[f.tramo-1].nombre)}</h2><span class="note">Clic en un producto para ver su historial</span></div>
-    ${prods.length?`<div class="tbl-wrap"><table class="cmp-t" style="--ncomp:${comps.length}">
+    ${prods.length?`<div class="tbl-wrap cmp-wrap"><table class="cmp-t" style="--ncomp:${comps.length}">
       <colgroup><col class="c-prod"><col class="c-own">${comps.map(()=>`<col class="c-comp">`).join("")}<col class="c-avg"><col class="c-pos"></colgroup>
       <thead><tr><th class="sticky-c">Producto</th><th class="r own-col">Duracreto</th>${comps.map(c=>`<th class="r" title="${esc(c.plantas.join(", "))}">${esc(c.nombre)}${plantasTxt(c)?`<span class="sub" style="text-transform:none;letter-spacing:0">${plantasTxt(c)}</span>`:""}</th>`).join("")}<th class="r">Prom. competencia</th><th class="r">Posición</th></tr></thead>
       <tbody>${rows.join("")}</tbody></table></div>`
@@ -1075,14 +1068,22 @@ function cargarFuenteNumeros(){
 let visible=false, tRefresco=0;
 function arrancarRefresco(){ clearInterval(tRefresco); tRefresco=setInterval(()=>{ if(visible&&S.me&&!document.hidden) refrescar(); }, 30000); }
 document.addEventListener("visibilitychange",()=>{ if(visible&&!document.hidden&&S.me) refrescar(); });
-const SECCIONES=[["comparar","Comparador"],["registrar","Registrar cotización"],["historial","Historial"],["precios","Precios Duracreto"],["catalogo","Catálogo"]];
+/* Secciones del estudio: [vista, texto, ícono] (íconos de 24×24 con trazo, mismo estilo que los del núcleo) */
+const ICS=d=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const SECCIONES=[
+  ["comparar","Comparador",ICS("<path d=\"M4 20V11M10 20V5M16 20v-7M21 20H3\"/>")],
+  ["registrar","Registrar cotización",ICS("<path d=\"M12 5v14M5 12h14\"/>")],
+  ["historial","Historial",ICS("<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 7v5l3 2\"/>")],
+  ["precios","Precios Duracreto",ICS("<path d=\"M3 12.6V4a1 1 0 0 1 1-1h8.6a1 1 0 0 1 .7.3l7.4 7.4a1 1 0 0 1 0 1.4l-8.6 8.6a1 1 0 0 1-1.4 0L3.3 13.3a1 1 0 0 1-.3-.7z\"/><circle cx=\"8\" cy=\"8\" r=\"1.6\"/>")],
+  ["catalogo","Catálogo",ICS("<path d=\"M9 6h11M9 12h11M9 18h11\"/><circle cx=\"4.5\" cy=\"6\" r=\"1\"/><circle cx=\"4.5\" cy=\"12\" r=\"1\"/><circle cx=\"4.5\" cy=\"18\" r=\"1\"/>")]
+];
 
 MV.registrar("precios", {
   relleno:false,
   async montar(el, ctx){
     CTX=ctx; MODEL=el; cargarFuenteNumeros();
     el.innerHTML=`<div class="precios-raiz">
-      <nav class="precios-tabs" id="precios-nav" aria-label="Secciones del estudio de precios" hidden>${SECCIONES.map(([k,l])=>`<button type="button" data-view="${k}">${l}</button>`).join("")}</nav>
+      <nav class="precios-tabs" id="precios-nav" aria-label="Secciones del estudio de precios" hidden>${SECCIONES.map(([k,l,ic])=>`<button type="button" data-view="${k}">${ic}<span>${l}</span></button>`).join("")}</nav>
       <div class="precios-main" id="precios-app"><div class="mv-pronto"><span class="mv-giro" style="width:28px;height:28px;color:var(--accent)"></span><p>Cargando el estudio de precios…</p></div></div>
       <div id="precios-overlay"></div><div id="precios-chat"></div></div>`;
     RAIZ=el.firstElementChild;
