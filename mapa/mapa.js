@@ -855,7 +855,8 @@ MV.registrar('mapa', {
     S.pendiente = (ctx.params && ctx.params.id) || null;
     esqueleto();
     const [datos] = await Promise.all([api('mapa.cargar'), cargarLibs()]);
-    if (!vivo()) return;
+    // Si el cascarón volvió a montar el módulo mientras esperábamos (p. ej. cambiaron los roles), este montaje ya no vale.
+    if (RAIZ !== el || !vivo()) return;
     crearMapa();
     aplicar(datos, true);
     setTimeout(() => M.map && M.map.invalidateSize(), 60);

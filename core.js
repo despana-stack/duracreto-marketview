@@ -21,7 +21,7 @@
  */
 (function () {
   'use strict';
-  const VERSION = '1.7.1';              // súbala junto con VERSION en sw.js cada vez que publique cambios
+  const VERSION = '1.8.0';              // súbala junto con VERSION en sw.js cada vez que publique cambios
   const API_URL = String(window.API_URL || '').trim();
   const DEMO = !API_URL;
   const K = { ses: 'mv_sesion', mod: 'mv_modulo', tema: 'mv_tema', tip: 'mv_tip_instalar' };
@@ -169,6 +169,7 @@
 
   /* ===================== Estructura de la app ===================== */
   function vistaApp() {
+    MODX.proyectos.nom = MODX.proyectos.largo = (S.usuario.roles || {}).proyectos === 'asesor' ? 'Mis proyectos' : 'Proyectos';   // chat Mapa: etiqueta según el rol
     const mods = misModulos();
     if (!mods.length) {
       $('#app').innerHTML = `<main class="mv-login"><div class="mv-login-card" style="text-align:center"><h1>Sin acceso</h1><p class="sub">Su usuario no tiene acceso a ningún módulo de MarketView. Pida acceso a Diego España.</p><button class="mv-btn ancho" id="mvSalir">Cerrar sesión</button></div></main>`;
