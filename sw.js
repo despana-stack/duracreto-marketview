@@ -1,6 +1,6 @@
 // Duracreto MarketView — service worker. Permite instalar la app y abrirla rápido. Nunca guarda datos del servidor.
 // Al publicar cambios en archivos de la app, sube VERSION en core.js y aquí (deben coincidir).
-const VERSION = '1.8.1';
+const VERSION = '1.8.2';
 const CACHE = 'marketview-' + VERSION;
 const APP = ['./', 'index.html', 'core.css', 'core.js', 'config.js', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png', 'icons/logo-claro.png', 'icons/logo-oscuro.png'];
