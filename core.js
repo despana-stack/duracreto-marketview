@@ -10,6 +10,8 @@
  *       montar(el, ctx) { ... },   // la primera vez que se abre: dibujar dentro de «el» (un div que ocupa toda el área)
  *       mostrar(ctx)   { ... },    // opcional: cada vez que se vuelve al módulo
  *       ocultar()      { ... },    // opcional: al cambiar a otro módulo (el div NO se borra; el estado se conserva)
+ *       desmontar()    { ... },    // opcional: el cascarón descarta el div (cambio de roles o cierre de sesión). Quitar oyentes
+ *                                  //   de window/document, temporizadores, etc.: el próximo montar() empieza de cero.
  *       relleno: true              // opcional: el área lleva márgenes (false para mapas a pantalla completa)
  *     });
  *   ctx = { usuario, rol, modulo, api(accion, args), aviso(texto, tipo), abrir(modulo, params), params, tema(), esCelular() }
@@ -21,7 +23,7 @@
  */
 (function () {
   'use strict';
-  const VERSION = '1.8.2';              // súbala junto con VERSION en sw.js cada vez que publique cambios
+  const VERSION = '1.8.3';              // súbala junto con VERSION en sw.js cada vez que publique cambios
   const API_URL = String(window.API_URL || '').trim();
   const DEMO = !API_URL;
   const K = { ses: 'mv_sesion', mod: 'mv_modulo', tema: 'mv_tema', tip: 'mv_tip_instalar' };
@@ -155,10 +157,19 @@
     const so = /iPhone|iPad/.test(ua) ? 'iPhone/iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'Mac' : 'Otro';
     return so + (instalada() ? ' · app' : ' · navegador');
   }
+  /** Descarta los módulos montados (antes de redibujar todo): ocultar() y desmontar() de cada uno, y se olvidan sus div. */
+  function soltarModulos() {
+    Object.keys(EST).forEach(k => {
+      const def = REG[k];
+      try { def && def.ocultar && def.ocultar(); } catch (e) { console.error(e); }
+      try { def && def.desmontar && EST[k].montado && def.desmontar(); } catch (e) { console.error(e); }
+      delete EST[k];
+    });
+    actual = null;
+  }
   function cerrarLocal() {
     S = null; store.del(K.ses);
-    Object.keys(EST).forEach(k => { try { REG[k] && REG[k].ocultar && REG[k].ocultar(); } catch (e) {} delete EST[k]; });
-    actual = null;
+    soltarModulos();
   }
   async function cerrarSesion() {
     const tk = S && S.token;
@@ -378,7 +389,7 @@
     if (!S || !d || !d.usuario) return;
     const antes = JSON.stringify(S.usuario.roles);
     S.usuario = d.usuario; store.set(K.ses, S);
-    if (JSON.stringify(d.usuario.roles) !== antes) render();
+    if (JSON.stringify(d.usuario.roles) !== antes) { soltarModulos(); render(); }   // roles nuevos: cada módulo se vuelve a montar limpio
   }).catch(() => {});
 
   // Service worker: instalación y apertura rápida. Avisa cuando hay una versión nueva.
