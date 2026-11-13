@@ -212,3 +212,10 @@
 .proy-dlg .fila-b{display:flex;gap:8px}
 .proy-dlg .err{color:var(--bad);font-size:13px}
 .proy-dlg .err:empty{display:none}
+
+/* Línea que no cuadra (total ≠ suma de los meses): aviso con dos salidas */
+.proy-drawer .cuadre{background:var(--warn-bg);border:1px solid var(--line);border-left:4px solid var(--orange);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.proy-drawer .cuadre p{margin:0;font-size:12.5px}
+.proy-drawer .cuadre .nota{font-size:11.5px}
+.proy-drawer .cuadre-acc{display:flex;flex-wrap:wrap;gap:8px}
+.proy-drawer .cuadre-acc .mv-btn{height:auto;min-height:38px;padding:7px 12px;font-size:12.5px;text-align:left;white-space:normal}

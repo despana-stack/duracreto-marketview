@@ -138,6 +138,27 @@ const R = {
   estado(l) {
     const s = R.suma(l), t = Number(l.total) || 0, libres = R.meses(l).filter(k => R.libre(l, k)).length;
     return { suma: s, total: t, ok: t > 0 && s === t, libres };
+  },
+  /* ---- Líneas que no cuadran (proyectos existentes: total ≠ suma de los meses) ---- */
+  /** Opción 1: el total pasa a ser la suma de los meses. */
+  usarSuma(l) { l.total = R.suma(l); },
+  /** Plan de la opción 2: en qué meses que vienen se reparte y si hay que alargar la duración. */
+  planFalta(l) {
+    const fin = R.meses(l).slice(-1)[0], hasta = [fin, sumarMes(R.hoy, 2)].sort()[1];
+    const libresYa = R.meses(l).filter(k => R.libre(l, k));
+    if (libresYa.length) return { plazo: Number(l.plazo), hasta: '' };
+    let plazo = Number(l.plazo); while (mesesDe(l.mes, plazo).slice(-1)[0] < hasta) plazo++;
+    return { plazo, hasta: plazo !== Number(l.plazo) ? hasta : '' };
+  },
+  /** Opción 2: suma lo que falta a los meses que vienen (libres), según la curva; alarga la duración si hace falta. */
+  repartirFalta(l) {
+    const falta = (Number(l.total) || 0) - R.suma(l); if (falta <= 0) return;
+    l.plazo = R.planFalta(l).plazo;
+    const ks = R.meses(l);
+    let dest = ks.filter(k => R.libre(l, k));
+    if (!dest.length) { dest = ks.filter(k => k >= R.hoy); dest.forEach(k => l.fij.delete(k)); }   // todos fijados: se liberan los que vienen
+    const w = R.peso(l), extra = repartir(falta, dest, dest.map(k => w[k]));
+    dest.forEach(k => { l.m[k] = (l.m[k] || 0) + extra[k]; });
   }
 };
 
@@ -564,7 +585,13 @@ function pintarLineas_() {
     const dif = st.total - st.suma;
     const msg = !st.total ? 'Escriba el total para repartirlo por mes.' :
       st.ok ? `Suma ${fmt(st.suma)} / ${fmt(st.total)} ✓` :
-      `Suma ${fmt(st.suma)} / ${fmt(st.total)} · ${dif > 0 ? 'faltan ' + fmt(dif) : 'sobran ' + fmt(-dif)}${st.libres ? '' : ' — no hay meses libres: ajuste el total o libere un mes (toque el 🔒)'}`;
+      `Suma ${fmt(st.suma)} / ${fmt(st.total)} · ${dif > 0 ? 'faltan ' + fmt(dif) : 'sobran ' + fmt(-dif)}`;
+    // No cuadra (típico en proyectos que vienen del cuadro): dos salidas en un toque. Si sobra, solo la primera.
+    const plan = dif > 0 ? R.planFalta(l) : null;
+    const cuadre = st.total && !st.ok ? `<div class="cuadre" role="alert"><p><b>Esta línea no cuadra:</b> los meses suman ${fmt(st.suma)} ${n.u} y el total es ${fmt(st.total)} ${n.u}.</p>
+        <div class="cuadre-acc">${st.suma > 0 ? `<button type="button" class="mv-btn" data-cuadre="suma">Usar la suma de los meses como total (${fmt(st.suma)})</button>` : ''}
+        ${dif > 0 ? `<button type="button" class="mv-btn primario" data-cuadre="repartir">Repartir lo que falta (${fmt(dif)}) en los meses que vienen</button>` : ''}</div>
+        ${plan && plan.hasta ? `<p class="nota">Para repartirlo se alarga la duración hasta ${fmtMes(plan.hasta)} (${plan.plazo} meses).</p>` : ''}</div>` : '';
     return `<div class="linea" data-i="${i}">
       <div class="linea-h">${icoNeg(l.neg, 22)}<b>${n.n}</b><span class="nota">${n.u === 'u' ? 'unidades' : 'm³'}</span><span style="flex:1"></span>
         ${ls.length > 1 ? `<button type="button" class="btn ghost quitar" data-quitar="${i}" aria-label="Quitar ${n.n}">Quitar</button>` : ''}</div>
@@ -581,6 +608,7 @@ function pintarLineas_() {
           <input type="number" min="0" step="1" inputmode="numeric" data-mes="${k}" value="${l.m[k] || 0}"${pas ? ' disabled title="Mes pasado: no se cambia"' : ''} aria-label="${fmtMes(k)}"></div>`;
       }).join('')}</div>
       <div class="suma${st.ok ? ' ok' : st.total ? ' mal' : ''}"><span>${msg}</span><button type="button" class="btn ghost" data-restablecer="${i}">Restablecer</button></div>
+      ${cuadre}
     </div>`;
   }).join('');
 }
@@ -667,6 +695,12 @@ async function clicFormulario(ev) {
   if (b.dataset.cat !== undefined && l) { l.cat = l.cat === b.dataset.cat ? '' : b.dataset.cat; pintarLineas(); return; }
   if (b.dataset.soltar && l) { l.fij.delete(b.dataset.soltar); pintarLineas(); return; }
   if (b.dataset.restablecer !== undefined && l) { R.restablecer(l); pintarLineas(); return; }
+  if (b.dataset.cuadre && l) {
+    if (b.dataset.cuadre === 'suma') { R.usarSuma(l); aviso(NEG[l.neg].n + ': el total quedó en ' + fmt(l.total) + ' ' + NEG[l.neg].u + '.'); }
+    else { R.repartirFalta(l); aviso(NEG[l.neg].n + ': lo que faltaba quedó repartido en los meses que vienen.'); }
+    const e = $('fp-err'); if (e) e.textContent = '';
+    pintarLineas(); return;
+  }
   const a = b.dataset.fp;
   if (a === 'cerrar') { cerrarFormulario(); return; }
   if (a === 'buscar') {
@@ -691,11 +725,16 @@ async function clicFormulario(ev) {
       const n = NEG[l2.neg].n, st = R.estado(l2);
       if (l2.neg === 'prefabricados' && !l2.prod) return `${n}: elija el producto.`;
       if (!st.total) return `${n}: escriba el total.`;
-      if (!st.ok) return `${n}: los meses suman ${fmt(st.suma)} y el total es ${fmt(st.total)}.`;
+      if (!st.ok) return `${n}: los meses no suman el total. Elija una de las opciones del aviso de esa línea.`;
       return '';
     }).filter(Boolean)[0];
     const falta = !d.cliente ? 'Escriba el cliente.' : !d.proyecto ? 'Escriba el nombre del proyecto.' : !d.tipo ? 'Elija el tipo de proyecto.' : (d.lat == null && !d.ref) ? 'Marque el punto en el mapa o escriba la dirección.' : (d.estado === 'Competencia' && !d.comp) ? 'Indique el competidor.' : malLinea || '';
-    if (falta) { err.textContent = falta; err.scrollIntoView({ block: 'nearest' }); return; }
+    if (falta) {
+      err.textContent = falta;
+      const cu = FP.el.querySelector('.cuadre');
+      (malLinea && cu && /no suman/.test(malLinea) ? cu : err).scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
     b.disabled = true; b.textContent = 'Guardando…';
     try {
       const r = await CTX.api('proyectos.guardar', {
