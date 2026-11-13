@@ -13,7 +13,8 @@
   const CORTO = { nov: 'Nov', dic: 'Dic', s4: 'Nov+Dic' };
 
   let raiz = null, C = null, P = null;          // div del módulo, ctx, paquete {datos, fuente}
-  let charts = {}, libChart = null, tBusca = 0, cargando = false;
+  let charts = {}, libChart = null, tBusca = 0, rafTema = 0, cargando = false;
+  let generacion = 0;                            // sube en desmontar(): una carga que vuelve después ya no dibuja
   const est = { periodo: null, vista: 'L', unidad: null, q: '', estado: '', unidadF: '', asesor: '', pagina: 0 };
   const mqCel = window.matchMedia('(max-width: 759px)');
   const mqMov = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -43,6 +44,14 @@
     const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(txt || ''));
     if (!m) return String(txt || '—');
     return conHora === 'corta' ? m[3] + '/' + m[2] : m[3] + '/' + m[2] + '/' + m[1] + (conHora && m[4] ? ' ' + m[4] + ':' + m[5] : '');
+  }
+
+  /** Días completos entre una fecha «aaaa-mm-dd» y hoy (hora local). null si no hay fecha. */
+  function diasDesde(txt) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(txt || ''));
+    if (!m) return null;
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    return Math.round((hoy - new Date(+m[1], m[2] - 1, +m[3])) / 864e5);
   }
 
   const IC = {
@@ -260,6 +269,7 @@
   async function cargar(forzar) {
     if (cargando) return;
     cargando = true;
+    const gen = generacion;
     const habia = !!P;
     const btn = raiz.querySelector('[data-acc="actualizar"]');
     if (btn) { btn.disabled = true; btn.classList.add('girando'); }
@@ -269,17 +279,19 @@
         C.api(forzar ? 'dashboard.refrescar' : 'dashboard.cargar', {}, { tiempo: 90 }),
         cargarChart().catch(() => null)            // si la librería no carga, las tarjetas igual se muestran
       ]);
+      if (gen !== generacion || !raiz) return;      // el módulo se desmontó mientras esperaba
       P = paquete;
       prepararEstado();
       pintar();
       if (forzar) C.aviso(P.fuente.origen === 'respaldo' ? 'La plantilla de IT no respondió: se muestra la copia guardada.' : 'Dashboard actualizado con la plantilla de IT.', P.fuente.origen === 'respaldo' ? 'error' : undefined);
     } catch (e) {
+      if (gen !== generacion || !raiz) return;
       if (habia) {                                  // falló «Actualizar»: se conserva lo que ya se veía
         C.aviso(e.message || 'No se pudo actualizar.', 'error');
         if (btn) { btn.disabled = false; btn.classList.remove('girando'); }
       } else if (e.codigo === 'permiso') pantallaSinAcceso(e.message);
       else pantallaError(e);
-    } finally { cargando = false; }
+    } finally { if (gen === generacion) cargando = false; }
   }
 
   function prepararEstado() {
@@ -307,7 +319,7 @@
       ${seccionKpis()}${seccionVeredicto()}${seccionUnidades()}${seccionZonas()}
       <div class="dash-dos">${seccionRanking()}${seccionTendencia()}</div>
       ${seccionProyectos()}${seccionPlantas()}${seccionNotas()}
-      <p class="dash-pie">Fuente temporal: plantilla de IT (Netlify). El Dashboard final se conectará a SAP.${d.meta && d.meta.corte_facturado_txt ? ' Facturado al ' + esc(d.meta.corte_facturado_txt) + '.' : ''}</p>
+      <p class="dash-pie">Fuente temporal: plantilla de IT (Netlify). El Dashboard final se conectará a SAP.</p>
     </div><div class="dash-panel" hidden></div></div>`;
     pintarProyectos();
     dibujarGraficos();
@@ -319,10 +331,19 @@
     const ps = d.periodos || [{ clave: 'nov', nombre: 'Noviembre' }, { clave: 'dic', nombre: 'Diciembre' }, { clave: 's4', nombre: 'Nov + Dic' }];
     const seg = (acc, items, actual) => `<div class="dash-seg" role="group">${items.map(i =>
       `<button type="button" data-acc="${acc}" data-v="${esc(i.v)}" aria-pressed="${i.v === actual}" title="${esc(i.t || i.n)}">${esc(i.n)}</button>`).join('')}</div>`;
-    const respaldo = f.origen === 'respaldo';
-    const corte = respaldo
-      ? `<span class="dash-corte aviso" title="${esc(f.aviso || '')}">${IC.alerta}Copia guardada del ${esc(fecha(f.leido, 'corta'))} — la plantilla de IT no respondió</span>`
-      : `<span class="dash-corte" title="Leído ${esc(f.leido || '')} (${esc(f.origen || '')})">${IC.reloj}Corte: ${esc(fecha(f.corte || (d.meta && d.meta.generado), true))}</span>`;
+    const m = d.meta || {};
+    const fFact = m.corte_facturado_txt || (m.corte_facturado ? fecha(m.corte_facturado) : '');
+    const fCuadro = m.fecha_cuadro_txt || (m.fecha_cuadro ? fecha(m.fecha_cuadro) : '');
+    const fechas = [fFact ? 'Facturado al ' + fFact : '', fCuadro ? 'Perspectivas al ' + fCuadro : ''].filter(Boolean).join(' · ')
+      || 'Corte: ' + fecha(f.corte || m.generado, true);
+    const atraso = diasDesde(m.corte_facturado);
+    let corte;
+    if (f.origen === 'respaldo')                    // la copia guardada tiene prioridad sobre cualquier otro aviso
+      corte = `<span class="dash-corte aviso" title="${esc(f.aviso || '')} ${esc(fechas)}">${IC.alerta}Copia guardada del ${esc(fecha(f.leido, 'corta'))} — la plantilla de IT no respondió</span>`;
+    else if (atraso > 3)
+      corte = `<span class="dash-corte aviso" title="${esc(fechas)}">${IC.alerta}<span>Datos de IT sin actualizar desde hace ${atraso} días <small>(${esc(fechas.replace('Facturado', 'facturado').replace('Perspectivas', 'perspectivas'))})</small></span></span>`;
+    else
+      corte = `<span class="dash-corte" title="Leído ${esc(f.leido || '')} (${esc(f.origen || '')})">${IC.reloj}${esc(fechas)}</span>`;
     const puede = C.rol === 'editor' && !(C.usuario && C.usuario.soloLectura);
     const unid = est.vista === 'V' ? `<div class="dash-unids" role="group" aria-label="Unidad de negocio">${unidadesVol().map(u =>
       `<button type="button" class="dash-chip" data-acc="unidad" data-v="${esc(u.nombre)}" aria-pressed="${u.nombre === est.unidad}">${esc(u.nombre)} <small>${esc(u.um)}</small></button>`).join('')}</div>` : '';
@@ -523,6 +544,7 @@
         <span class="dash-badge ${sev(c.severidad)}">${esc(c.severidad || 'INFO')}</span><small>${esc(c.fuente || '')}${num(c.registros) ? ' · ' + nf(c.registros) + ' registros' : ''}${num(c.impacto) ? ' · ' + fmtLc(c.impacto) : ''}</small>
         <b>${esc(c.validacion || '')}</b>${c.detalle ? `<p>${esc(c.detalle)}</p>` : ''}</li>`).join('')}</ul>` : ''}
       ${sup.length ? `<h3>Supuestos</h3><ul class="dash-sup">${sup.map(s => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
+      ${m.generado ? `<p class="dash-nota">Plantilla generada por IT el ${esc(fecha(m.generado, true))}.</p>` : ''}
       ${archivos.length ? `<p class="dash-nota">Archivos de origen: ${archivos.map(esc).join(' · ')}.</p>` : ''}
       <p class="dash-nota"><b>Fuente temporal: plantilla de IT (Netlify). El Dashboard final se conectará a SAP.</b></p></details>`;
   }
@@ -590,7 +612,7 @@
     tBusca = setTimeout(() => { est.q = e.target.value; est.pagina = 0; pintarProyectos(); }, 200);
   }
   // Cambio de tema: los colores del lienzo se vuelven a leer de las variables CSS.
-  function alTema() { requestAnimationFrame(dibujarGraficos); }
+  function alTema() { cancelAnimationFrame(rafTema); rafTema = requestAnimationFrame(dibujarGraficos); }
   // Cruce celular ↔ computadora: las barras de unidades cambian de orientación.
   function alCambiarAncho() { if (P && raiz) pintar(); }
 
@@ -610,11 +632,17 @@
       Object.keys(charts).forEach(k => { try { charts[k].resize(); } catch (e) {} });
     },
     ocultar() { cerrarPanel(); },
+    // Contrato del cascarón 1.8.3: al cerrar sesión o cambiar roles se descarta el div; el próximo montar() empieza de cero.
     desmontar() {
-      cerrarPanel(); destruirGraficos(); clearTimeout(tBusca);
+      generacion++; cargando = false;
+      cerrarPanel(); destruirGraficos();
+      clearTimeout(tBusca); cancelAnimationFrame(rafTema);
       window.removeEventListener('mv:tema', alTema);
       mqCel.removeEventListener('change', alCambiarAncho);
-      if (raiz) { raiz.removeEventListener('click', alClic); raiz.removeEventListener('change', alCambiar); raiz.removeEventListener('input', alEscribir); }
+      if (raiz) {
+        raiz.removeEventListener('click', alClic); raiz.removeEventListener('change', alCambiar); raiz.removeEventListener('input', alEscribir);
+        raiz.innerHTML = '';
+      }
       raiz = null; C = null; P = null;
       Object.assign(est, { periodo: null, vista: 'L', unidad: null, q: '', estado: '', unidadF: '', asesor: '', pagina: 0, _vistaLeida: false });
     }
