@@ -247,6 +247,10 @@
 .precios-raiz .thread small{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px}
 @media (max-width:640px){.precios-raiz .head h1{font-size:19px}}
 @media (prefers-reduced-motion:reduce){.precios-raiz .chat-hola{animation:none}}
+/* Precio único (Precios Duracreto y cajón del producto) */
+.precios-raiz .precios-unico{min-height:0;margin-top:6px;font-size:11.5px;color:var(--muted);gap:6px;cursor:pointer}
+.precios-raiz .unico-txt{font-size:12px;font-style:italic}
+
 /* Resumen de proyectos (panel del Historial) */
 .precios-raiz .rep-acts{display:flex;gap:8px;flex-wrap:wrap}
 .precios-raiz .rep-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:8px}

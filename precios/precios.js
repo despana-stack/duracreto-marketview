@@ -52,7 +52,7 @@ const S = {
     serv:false, servFile:null, rec:false, recQ:"", recSug:[], recBusy:false, lugar:null, dist:null, distBusy:false, distErr:"", recComp:"", temp:false, tempComp:"", tempBolsas:"", flete:false, fleteComp:"", fleteTP:""},
   me:null, usuarios:[], assets:null, recentOpen:false,
   chat:{open:false, msgs:[], threads:[], sel:null, selMsgs:[], unsub:null, unsubSel:null, sending:false},
-  pr:{neg:"concreto", planta:"", desde:today(), nota:"", draft:{}},
+  pr:{neg:"concreto", planta:"", desde:today(), nota:"", draft:{}, unico:{}},
   cat:{tab:"productos", neg:"concreto", edit:null, np:{familia:"",nombre:"",esp:"",unidad:"",codigo:""}, paste:"", npl:{nombre:"",ciudad:"",mercado:"",negocios:["concreto"]}},
   rep:{open:false, periodo:"90", desde:"", hasta:"", neg:"", asesor:"", mercado:"", comp:"", busy:""},
   drawer:null, names:{}, confirmDel:null
@@ -105,7 +105,9 @@ function precioEnFecha(plantaId, prodId, fecha){
     if(!best || r.desde>best.desde || (r.desde===best.desde && (r.ts||0)>(best.ts||0))) best=r; }
   return best||precioVigente(plantaId, prodId);
 }
-function precioTramo(rec, t){ if(!rec||!rec.p) return {v:null}; for(let i=t-1;i>=0;i--){ if(rec.p[i]!=null) return {v:rec.p[i], fallback:i!==t-1}; } return {v:null}; }
+/* Precio único: la versión solo tiene la primera categoría (p=[precio,null,null,null]); vale para cualquier volumen. */
+const esUnico = rec => !!(rec&&Array.isArray(rec.p)&&rec.p[0]!=null&&rec.p.slice(1).every(x=>x==null));
+function precioTramo(rec, t){ if(!rec||!rec.p) return {v:null}; if(esUnico(rec)) return {v:rec.p[0], fallback:false, unico:true}; for(let i=t-1;i>=0;i--){ if(rec.p[i]!=null) return {v:rec.p[i], fallback:i!==t-1}; } return {v:null}; }
 /* última cotización de competidor */
 const empresaDe = p => ((p&&(p.empresa||p.nombre))||"").trim();
 function compGroups(neg, mercado){ const m=new Map();
@@ -174,7 +176,7 @@ function vComparar(){
       const rank=[...vals,own].sort((a,b)=>a-b).indexOf(own)+1; pos=`${diffChip(own,avg)}<span class="sub">${rank}° de ${vals.length+1} (más barato = 1°)</span>`; }
     rows.push(`<tr class="row-click" data-act="open" data-id="${p.id}">
       <td class="sticky-c prod"><b>${esc(p.nombre)}</b><small>${esc([p.especificacion,p.unidad||u].filter(Boolean).join(" · "))}</small></td>
-      <td class="r own-col"><div class="cell-price">${money(own)}</div>${op.fallback?`<span class="tag warn" title="Sin precio para esta categoría; se usa la anterior">categoría inferior</span>`:""}${rec?`<span class="sub">desde ${fmtDate(rec.desde)}</span>`:""}</td>
+      <td class="r own-col"><div class="cell-price">${money(own)}</div>${op.unico&&ts.length>1?`<span class="tag" title="Precio único: aplica a cualquier volumen">precio único</span>`:op.fallback?`<span class="tag warn" title="Sin precio para esta categoría; se usa la anterior">categoría inferior</span>`:""}${rec?`<span class="sub">desde ${fmtDate(rec.desde)}</span>`:""}</td>
       ${cells}
       <td class="r"><div class="cell-price">${money(avg)}</div><span class="sub">mín ${money(mn)}</span></td>
       <td class="r">${pos}</td></tr>`);
@@ -226,7 +228,7 @@ function renderDrawer(){
     </tbody></table></div>`:`<p class="note">Sin cotizaciones registradas para este producto en ${esc(f.mercado)}.</p>`}</div>
     <div><span class="lbl">Lista de precios Duracreto</span>
     ${ownHist.length?`<div class="tbl-wrap"><table><thead><tr><th>Vigente desde</th><th>Planta</th>${ts.map(t=>`<th class="r">${esc(t.nombre)}</th>`).join("")}</tr></thead><tbody>
-      ${ownHist.map(r=>`<tr><td>${fmtDate(r.desde)}</td><td>${esc(plantaById(r.plantaId)?.nombre)}</td>${ts.map((_,i)=>`<td class="r cell-price">${money(r.p?.[i])}</td>`).join("")}</tr>`).join("")}
+      ${ownHist.map(r=>`<tr><td>${fmtDate(r.desde)}</td><td>${esc(plantaById(r.plantaId)?.nombre)}</td>${ts.map((_,i)=>ts.length>1&&i>0&&esUnico(r)?`<td class="r"><span class="dim unico-txt">precio único</span></td>`:`<td class="r cell-price">${money(r.p?.[i])}</td>`).join("")}</tr>`).join("")}
     </tbody></table></div>`:`<p class="note">Sin precios propios cargados.</p>`}</div>
   </aside>`;
 }
@@ -731,14 +733,23 @@ function repXLSX(d){
 }
 
 /* ===== Precios Duracreto ===== */
+/* ¿La fila es de precio único? La casilla del usuario manda; si no la ha tocado, se ve la versión vigente. */
+const unicoDe = (pid, rec) => Object.prototype.hasOwnProperty.call(S.pr.unico, pid) ? !!S.pr.unico[pid] : esUnico(rec);
+/* Guarda o descarta el borrador de una fila según si cambió frente a la versión vigente. */
+function syncDraft(pid, d, rec){
+  const same=d.every((x,k)=>String(num(x)??"")===String(rec?.p?.[k]??""));
+  if(same){ delete S.pr.draft[pid]; if(!!S.pr.unico[pid]===esUnico(rec)) delete S.pr.unico[pid]; } else S.pr.draft[pid]=d;
+  return same;
+}
 function vPrecios(){
   const s=S.pr, owns=plantasDe(s.neg,null,"propia"); if(!owns.find(o=>o.id===s.planta)) s.planta=owns[0]?.id||"";
   const prods=prodsDe(s.neg), ts=tramosDe(s.neg); const dis=S.canEdit?"":"disabled";
   const nChanged=Object.keys(s.draft).length; let fam=null;
-  const rows=prods.map(p=>{ const rec=precioVigente(s.planta,p.id), d=s.draft[p.id];
+  const varios=ts.length>1;
+  const rows=prods.map(p=>{ const rec=precioVigente(s.planta,p.id), d=s.draft[p.id], uni=varios&&unicoDe(p.id,rec);
     let famRow=""; if((p.familia||"")!==fam){ fam=p.familia||""; if(fam) famRow=`<tr class="fam-row"><td colspan="${ts.length+2}">${esc(fam)}</td></tr>`; }
-    return famRow+`<tr><td class="prod"><b>${esc(p.nombre)}</b><small>${esc([p.especificacion,p.unidad].filter(Boolean).join(" · "))}</small></td>
-    ${ts.map((_,i)=>{ const cur=rec?.p?.[i]; const val=d?d[i]:(cur??""); const ch=d&&String(d[i]??"")!==String(cur??"");
+    return famRow+`<tr><td class="prod"><b>${esc(p.nombre)}</b><small>${esc([p.especificacion,p.unidad].filter(Boolean).join(" · "))}</small>${varios&&S.canEdit?`<label class="check precios-unico"><input type="checkbox" data-unico="${p.id}" ${uni?"checked":""}> Precio único (aplica a cualquier volumen)</label>`:""}</td>
+    ${ts.map((_,i)=>{ if(uni&&i>0) return `<td class="r"><span class="dim unico-txt">precio único</span></td>`; const cur=rec?.p?.[i]; const val=d?d[i]:(cur??""); const ch=d&&String(d[i]??"")!==String(cur??"");
       return `<td class="r"><input class="price-in ${ch?"changed":""}" type="text" inputmode="decimal" id="precios-pp-${p.id}-${i}" data-price="${p.id}" data-i="${i}" value="${esc(val)}" placeholder="—" ${dis} aria-label="${esc(p.nombre)} ${esc(ts[i].nombre)}"></td>`; }).join("")}
     <td>${rec?fmtDate(rec.desde):"<span class='dim'>Sin precio</span>"}</td></tr>`; }).join("");
   return `<div class="head"><div><h1>Lista de precios Duracreto</h1><p>Precio unitario sin ISV por planta y categoría de volumen (máximo cuatro). Cada vez que guardas se crea una nueva versión con su fecha de vigencia; el historial se conserva.</p></div></div>
@@ -754,7 +765,7 @@ function vPrecios(){
   ${prods.length?`<div class="tbl-wrap"><table><thead><tr><th>Producto</th>${ts.map(t=>`<th class="r">${esc(t.nombre)}${tramoRango(t)?`<span class="sub" style="text-transform:none">${esc(tramoRango(t))}</span>`:""}</th>`).join("")}<th>Vigente desde</th></tr></thead><tbody>${rows}</tbody></table></div>`
   :`<div class="empty"><h3>Sin productos de ${esc(NEGL[s.neg])}</h3>Agrega productos en el catálogo y aquí aparecerá la cuadrícula de precios por categoría.<br><button class="btn primary" data-act="go" data-v="catalogo">Ir al catálogo</button></div>`}
   </section>
-  <p class="note">Si un producto tiene un solo precio (servicios, La Ceiba), llena solo la primera categoría: el comparador usa ese precio en las categorías superiores y lo marca como "categoría inferior".</p>`;
+  <p class="note">Si un producto tiene un solo precio, llena solo la primera categoría: se usa para cualquier volumen y se marca como precio único.</p>`;
 }
 
 /* ===== Catálogo ===== */
@@ -872,7 +883,7 @@ on("click", async e=>{
   if(a==="f-neg"){ S.f.neg=v; return rerender(); }
   if(a==="f-tramo"){ S.f.tramo=Number(v); return rerender(); }
   if(a==="r-neg"){ if(S.reg.neg!==v){ S.reg.neg=v; S.reg.items=[newItem()]; S.reg.err={}; } return rerender(); }
-  if(a==="p-neg"){ S.pr.neg=v; S.pr.draft={}; return rerender(); }
+  if(a==="p-neg"){ S.pr.neg=v; S.pr.draft={}; S.pr.unico={}; return rerender(); }
   if(a==="c-neg"){ S.cat.neg=v; S.cat.edit=null; return rerender(); }
   if(a==="cat-tab"){ S.cat.tab=v; return rerender(); }
   if(a==="open"){ S.drawer=id; return rerender(); }
@@ -923,9 +934,11 @@ function onField(e){
     if(f.size>20*1048576&&!esFoto(f)){ S.reg.err.file="El archivo pasa de 20 MB."; return rerender(); }
     S.reg.file=f; delete S.reg.err.file; return rerender(); }
   if(el.dataset.price){ const pid=el.dataset.price, i=Number(el.dataset.i); const rec=precioVigente(S.pr.planta,pid);
-    const nT=tramosDe(S.pr.neg).length, idx=[...Array(nT).keys()]; const d=S.pr.draft[pid]||idx.map(k=>rec?.p?.[k]??""); d[i]=el.value; const same=idx.every(k=>String(num(d[k])??"")===String(rec?.p?.[k]??""));
-    if(same) delete S.pr.draft[pid]; else S.pr.draft[pid]=d; el.classList.toggle("changed",!same);
+    const nT=tramosDe(S.pr.neg).length, idx=[...Array(nT).keys()]; const d=S.pr.draft[pid]||idx.map(k=>rec?.p?.[k]??""); d[i]=el.value; const same=syncDraft(pid, d, rec); el.classList.toggle("changed",!same);
     const b=document.querySelector('[data-act="save-prices"]'); const n=Object.keys(S.pr.draft).length; if(b){ b.disabled=!n||!S.canEdit; b.textContent=`Guardar ${n||""} cambio${n===1?"":"s"}`; } return; }
+  if(el.dataset.unico && e.type==="change"){ const pid=el.dataset.unico, rec=precioVigente(S.pr.planta,pid), nT=tramosDe(S.pr.neg).length;
+    const d=S.pr.draft[pid]||[...Array(nT).keys()].map(k=>rec?.p?.[k]??""); if(el.checked) for(let k=1;k<nT;k++) d[k]="";
+    S.pr.unico[pid]=el.checked; syncDraft(pid, d, rec); return rerender(); }
   if(el.dataset.nplneg && e.type==="change"){ const k=el.dataset.nplneg, arr=S.cat.npl.negocios; if(el.checked&&!arr.includes(k)) arr.push(k); if(!el.checked) S.cat.npl.negocios=arr.filter(x=>x!==k); return; }
   if(el.dataset.trn && e.type==="change"){ const k=el.dataset.trn, nT=Number(el.value); for(let i=0;i<4;i++){ const c=document.querySelector(`[data-trcol="${k}-${i}"]`); if(c) c.style.opacity=i<nT?"1":".3"; } return; }
   if(el.dataset.plemp && e.type==="change"){ const v=el.value.trim(); if(!v) return; S.db.doc("plantas/"+el.dataset.plemp).update({empresa:v}).then(()=>toast("Empresa actualizada")).catch(fail); return; }
@@ -1038,9 +1051,9 @@ async function savePrices(){
   const s=S.pr; if(!s.planta) return; const ids=Object.keys(s.draft); if(!ids.length) return;
   if(!s.desde) return toast("Indica la fecha de vigencia");
   let n=0;
-  for(const pid of ids){ const p=s.draft[pid].map(num);
+  for(const pid of ids){ let p=s.draft[pid].map(num); if(p.length>1&&unicoDe(pid, precioVigente(s.planta,pid))) p=p.map((x,i)=>i?null:x);   // precio único: solo la primera categoría
     try{ await S.db.collection("maestro/v1/precios").add({plantaId:s.planta,productoId:pid,p,desde:s.desde,nota:s.nota.trim(),por:S.me?.usuario||null,ts:Date.now()}); n++; }catch(err){ fail(err); break; } }
-  s.draft={}; s.nota=""; toast(`${n} precio${n===1?"":"s"} actualizado${n===1?"":"s"}`); rerender();
+  s.draft={}; s.unico={}; s.nota=""; toast(`${n} precio${n===1?"":"s"} actualizado${n===1?"":"s"}`); rerender();
 }
 async function saveTramos(){
   const tramos={};
