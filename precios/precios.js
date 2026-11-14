@@ -54,6 +54,7 @@ const S = {
   chat:{open:false, msgs:[], threads:[], sel:null, selMsgs:[], unsub:null, unsubSel:null, sending:false},
   pr:{neg:"concreto", planta:"", desde:today(), nota:"", draft:{}},
   cat:{tab:"productos", neg:"concreto", edit:null, np:{familia:"",nombre:"",esp:"",unidad:"",codigo:""}, paste:"", npl:{nombre:"",ciudad:"",mercado:"",negocios:["concreto"]}},
+  rep:{open:false, periodo:"90", desde:"", hasta:"", neg:"", asesor:"", mercado:"", comp:"", busy:""},
   drawer:null, names:{}, confirmDel:null
 };
 try{ const v=localStorage.getItem("mv_precios_vista"); if(v) S.view=v; }catch(e){}
@@ -203,6 +204,7 @@ function vComparar(){
 /* ===== Drawer historial producto ===== */
 function renderDrawer(){
   const ov=document.getElementById("precios-overlay");
+  if(S.rep.open){ ov.innerHTML=renderRep(); return; }
   if(S.edit){ ov.innerHTML=renderEdit(); return; }
   if(S.recentOpen){ ov.innerHTML=renderRecent(); return; }
   if(!S.drawer){ ov.innerHTML=""; return; }
@@ -501,27 +503,39 @@ function dcDe(c){
   return {v: own?precioTramo(precioEnFecha(own.id,p.id,c.fecha),c.tramo).v:null, planta:own};
 }
 const esConcretoM3 = p => p && p.negocio==="concreto" && (p.familia||"")!=="Servicios";
+/* Totales de una cotización (todas sus filas): lo usan la tarjeta del Historial y el Resumen de proyectos, para que den siempre lo mismo.
+   filas: una por producto y una por cada condición (recargo, temperatura, flete), con precio unitario de competencia (vc) y Duracreto (vd),
+   cantidad y subtotales. Las filas sin precio de alguno de los dos o sin cantidad no se suman (incompleto = true). */
+function totalesCot(g){
+  const c0=g.items[0], filas=[]; let tc=0, td=0, incompleto=false, volConc=0;
+  const fila=(o, vc, vd, cant)=>{ const sc=vc!=null&&cant!=null?vc*cant:null, sd=vd!=null&&cant!=null?vd*cant:null;
+    if(sc!=null&&sd!=null){ tc+=sc; td+=sd; } else incompleto=true;
+    filas.push(Object.assign(o,{vc, vd, cant, sc, sd})); };
+  for(const c of g.items){ const p=prodById(c.productoId), sl=!!(c.servicioConstruccion&&c.servLista), v=sl?num(c.precio):sinISV(c), dc0=dcDe(c), dc=sl&&dc0.v!=null?{...dc0, v:Math.round(dc0.v*(1+isv())*100)/100}:dc0; if(esConcretoM3(p)) volConc+=Number(c.volumen)||0;
+    fila({tipo:"prod", c, p, sl, dc0, dc}, v, dc.v, Number(c.volumen)||null); }
+  if(c0.recargo) fila({tipo:"recargo"}, num(c0.recargoComp), num(c0.recargoDC)??0, volConc||null);
+  if(c0.temperatura) fila({tipo:"temp"}, num(c0.tempComp), num(c0.tempDC), num(c0.tempVol)||volConc||null);
+  if(c0.flete) fila({tipo:"flete"}, num(c0.fleteComp), num(c0.fleteTP), 1);
+  const lineas=filas.filter(f=>f.tipo==="prod").map(f=>({nombre:f.p?.nombre||"Producto eliminado", vol:f.c.volumen??null, unidad:f.p?.unidad||""}));
+  return {tc, td, incompleto, volConc, lineas, filas};
+}
 function cotCardHTML(g){
   const c0=g.items[0], pl0=plantaById(c0.plantaId), dueno=gestionaCot();
-  const filas=[]; let tc=0, td=0, incompleto=false;
-  const fila=(nombre, sub, catVol, vc, vd, cant, acts, extra)=>{ const sc=vc!=null&&cant!=null?vc*cant:null, sd=vd!=null&&cant!=null?vd*cant:null;
-    if(sc!=null&&sd!=null){ tc+=sc; td+=sd; } else incompleto=true;
-    filas.push(`<tr class="${extra||""}"><td><b>${nombre}</b>${sub?`<span class="sub">${sub}</span>`:""}</td><td>${catVol}</td>
-      <td class="r"><span class="cell-price">${money(vc)}</span></td><td class="r"><span class="cell-price">${money(vd)}</span>${vd!=null&&vc!=null?`<div>${diffChip(vd,vc)}</div>`:""}</td>
-      <td class="r num">${money(sc)}</td><td class="r num">${money(sd)}</td><td class="acts">${acts||""}</td></tr>`); };
-  let volConc=0;
-  for(const c of g.items){ const p=prodById(c.productoId), sl=!!(c.servicioConstruccion&&c.servLista), v=sl?num(c.precio):sinISV(c), dc0=dcDe(c), dc=sl&&dc0.v!=null?{...dc0, v:Math.round(dc0.v*(1+isv())*100)/100}:dc0; if(esConcretoM3(p)) volConc+=Number(c.volumen)||0;
-    const acts=S.confirmDel===c.id?`<span class="confirm">¿Eliminar? <button class="btn danger" data-act="del-q" data-id="${c.id}">Sí</button><button class="btn ghost" data-act="del-cancel">No</button></span>`
-      :dueno?`<span class="row-acts"><button class="icon-btn" data-act="edit-q" data-id="${c.id}" title="Editar" aria-label="Editar producto">✎</button><button class="icon-btn" data-act="del-ask" data-id="${c.id}" title="Eliminar" aria-label="Eliminar producto">✕</button></span>`:"";
-    fila(esc(p?.nombre||"Producto eliminado"), [c.incluyeISV?`${money(c.precio)} c/ISV`:"", dc.serv?"Duracreto: precio de servicio":"", sl?`Competencia exento · Duracreto: lista + ISV (${money(dc0.v)} sin ISV)`:""].filter(Boolean).join(" · "),
-      `T${c.tramo}${c.volumen!=null?`<span class="sub num">${c.volumen} ${esc(p?.unidad||"")}</span>`:""}`, v, dc.v, Number(c.volumen)||null, acts);
-  }
-  if(c0.recargo){ const lugar=c0.lugar?.nombre||"", pc=String(c0.plantaCercana||"").replace(/^Duracreto - (Planta )?/,"");
-    fila("Recargo por distancia", `${esc(lugar)}${pc?` · ${esc(pc)} a ${c0.distanciaKm} km${Number(c0.recargoDC)?"":" — Duracreto sin recargo"}`:""}`, `<span class="sub num">${volConc} m³</span>`,
-      num(c0.recargoComp), num(c0.recargoDC)??0, volConc||null, "", "extra"); }
-  if(c0.temperatura){ fila("Control de temperatura", `Duracreto: ${c0.tempBolsas} bolsa${Number(c0.tempBolsas)===1?"":"s"} × ${money(c0.precioBolsa)} por m³`, `<span class="sub num">${num(c0.tempVol)||volConc} m³</span>`,
-      num(c0.tempComp), num(c0.tempDC), num(c0.tempVol)||volConc||null, "", "extra"); }
-  if(c0.flete){ fila("Flete (total)", "Duracreto: Transportes Platino", `<span class="sub">Global</span>`, num(c0.fleteComp), num(c0.fleteTP), 1, "", "extra"); }
+  const T=totalesCot(g), {tc, td, incompleto, volConc}=T;
+  const fila=(nombre, sub, catVol, f, acts, extra)=>`<tr class="${extra||""}"><td><b>${nombre}</b>${sub?`<span class="sub">${sub}</span>`:""}</td><td>${catVol}</td>
+      <td class="r"><span class="cell-price">${money(f.vc)}</span></td><td class="r"><span class="cell-price">${money(f.vd)}</span>${f.vd!=null&&f.vc!=null?`<div>${diffChip(f.vd,f.vc)}</div>`:""}</td>
+      <td class="r num">${money(f.sc)}</td><td class="r num">${money(f.sd)}</td><td class="acts">${acts||""}</td></tr>`;
+  const filas=T.filas.map(f=>{
+    if(f.tipo==="prod"){ const c=f.c, p=f.p;
+      const acts=S.confirmDel===c.id?`<span class="confirm">¿Eliminar? <button class="btn danger" data-act="del-q" data-id="${c.id}">Sí</button><button class="btn ghost" data-act="del-cancel">No</button></span>`
+        :dueno?`<span class="row-acts"><button class="icon-btn" data-act="edit-q" data-id="${c.id}" title="Editar" aria-label="Editar producto">✎</button><button class="icon-btn" data-act="del-ask" data-id="${c.id}" title="Eliminar" aria-label="Eliminar producto">✕</button></span>`:"";
+      return fila(esc(p?.nombre||"Producto eliminado"), [c.incluyeISV?`${money(c.precio)} c/ISV`:"", f.dc.serv?"Duracreto: precio de servicio":"", f.sl?`Competencia exento · Duracreto: lista + ISV (${money(f.dc0.v)} sin ISV)`:""].filter(Boolean).join(" · "),
+        `T${c.tramo}${c.volumen!=null?`<span class="sub num">${c.volumen} ${esc(p?.unidad||"")}</span>`:""}`, f, acts); }
+    if(f.tipo==="recargo"){ const lugar=c0.lugar?.nombre||"", pc=String(c0.plantaCercana||"").replace(/^Duracreto - (Planta )?/,"");
+      return fila("Recargo por distancia", `${esc(lugar)}${pc?` · ${esc(pc)} a ${c0.distanciaKm} km${Number(c0.recargoDC)?"":" — Duracreto sin recargo"}`:""}`, `<span class="sub num">${volConc} m³</span>`, f, "", "extra"); }
+    if(f.tipo==="temp") return fila("Control de temperatura", `Duracreto: ${c0.tempBolsas} bolsa${Number(c0.tempBolsas)===1?"":"s"} × ${money(c0.precioBolsa)} por m³`, `<span class="sub num">${num(c0.tempVol)||volConc} m³</span>`, f, "", "extra");
+    return fila("Flete (total)", "Duracreto: Transportes Platino", `<span class="sub">Global</span>`, f, "", "extra");
+  });
   const d=tc?(td-tc)/tc:null;
   const badges=[c0.servicioConstruccion?(c0.servLista?`<span class="tag">Servicio de construcción · vs. lista + ISV</span>`:`<span class="tag warn">Servicio de construcción · fuera del comparador</span>`):"", c0.recargo?`<span class="tag">Recargo por distancia</span>`:"", c0.temperatura?`<span class="tag">Control de temperatura</span>`:"", c0.flete?`<span class="tag">Flete</span>`:""].filter(Boolean).join(" ");
   const anexoL=a=>a?.url?`<a href="${esc(a.url)}" target="_blank" rel="noopener">Ver anexo</a>`:a?.nombre?`<span title="${esc(a.nota||"")}">${esc(a.nombre)}</span>`:"";
@@ -546,7 +560,7 @@ function vHistorial(){
   const comps=[...new Set(S.plantas.filter(p=>p.tipo==="competencia"&&(!h.mercado||p.mercado===h.mercado)&&(!h.neg||(p.negocios||[]).includes(h.neg))).map(empresaDe))].sort((a,b)=>a.localeCompare(b,"es"));
   const prods=h.neg?prodsDe(h.neg):sortProds(S.productos);
   return `<div class="head"><div><h1>${S.me.rol==="asesor"?"Mi historial de cotizaciones":"Historial de cotizaciones"}</h1><p>${S.me.rol==="asesor"?"Las cotizaciones de la competencia que usted registró.":S.me.rol==="area"?"Cotizaciones de la competencia de su negocio.":"Todas las cotizaciones de la competencia registradas por el equipo."} Precios mostrados sin ISV.</p></div>
-  ${S.dl?`<button class="btn" data-act="csv" ${list.length?"":"disabled"}>Descargar CSV</button>`:""}</div>
+  <div class="row-acts"><button class="btn" data-act="rep-abrir">Resumen de proyectos</button>${S.dl?`<button class="btn" data-act="csv" ${list.length?"":"disabled"}>Descargar CSV</button>`:""}</div></div>
   <section class="panel"><div class="panel-b filters">
     <div class="fld"><label for="precios-h-neg">Negocio</label><select id="precios-h-neg" data-bind="h.neg"><option value="">Todos</option>${negVis().map(n=>`<option value="${n.k}" ${h.neg===n.k?"selected":""}>${n.l}</option>`).join("")}</select></div>
     <div class="fld"><label for="precios-h-merc">Mercado</label><select id="precios-h-merc" data-bind="h.mercado"><option value="">Todos</option>${allMercados().map(m=>`<option ${h.mercado===m?"selected":""}>${esc(m)}</option>`).join("")}</select></div>
@@ -557,6 +571,163 @@ function vHistorial(){
   <section class="panel"><div class="panel-h"><h2>${grupos.length} cotizaci${grupos.length===1?"ón":"ones"}</h2><span class="note">${list.length} producto${list.length===1?"":"s"} · precios sin ISV</span></div>
   ${grupos.length?`<div class="cot-list">${grupos.map(cotCardHTML).join("")}</div>`:`<div class="empty"><h3>No hay cotizaciones con estos filtros</h3>Registra la primera desde el módulo Registrar cotización.<br><button class="btn primary" data-act="go" data-v="registrar">Registrar cotización</button></div>`}
   </section>`;
+}
+
+/* ===== Resumen de proyectos (Historial → PDF y Excel) =====
+   Una fila por cotización (agruparCot) con los mismos totales de su tarjeta (totalesCot). Montos en L sin ISV. */
+const esAdminRep = () => ["editor","consulta","visualizador"].includes(S.me?.rol);
+const PERIODOS = [["mes","Este mes"],["mesAnt","Mes anterior"],["90","Últimos 90 días"],["anio","Este año"],["rango","Rango"]];
+const moneyN = v => "L "+Number(v||0).toLocaleString("es-HN",{maximumFractionDigits:0});
+const pctTxt = v => v==null?"":(v>0?"+":"")+(v*100).toFixed(1)+" %";
+function repRango(){
+  const r=S.rep, hoy=today(), [y,m]=hoy.split("-").map(Number), f=d=>d.toISOString().slice(0,10);
+  if(r.periodo==="mes") return {desde:`${y}-${String(m).padStart(2,"0")}-01`, hasta:hoy};
+  if(r.periodo==="mesAnt"){ const d0=new Date(Date.UTC(y,m-2,1)), d1=new Date(Date.UTC(y,m-1,0)); return {desde:f(d0), hasta:f(d1)}; }
+  if(r.periodo==="anio") return {desde:`${y}-01-01`, hasta:hoy};
+  if(r.periodo==="rango"){ let a=r.desde||"", b=r.hasta||""; if(a&&b&&a>b) [a,b]=[b,a]; return {desde:a, hasta:b}; }
+  const d=new Date(Date.parse(hoy)); d.setUTCDate(d.getUTCDate()-89); return {desde:f(d), hasta:hoy};
+}
+/* «Concreto 4,000 PSI TMA 3/4"» → «4000 3/4»; «Servicio de bomba» → «Bomba» */
+function nombreCorto(n){
+  let s=String(n||"").replace(/^Concreto\s+/i,"").replace(/^Servicio\s+de\s+/i,"").replace(/(\d),(\d{3})/g,"$1$2").replace(/\s*PSI\b/gi,"").replace(/\bTMA\s*/gi,"").replace(/["”]/g,"").replace(/\s+/g," ").trim();
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+function repDatos(){
+  const r=S.rep, {desde,hasta}=repRango(), admin=esAdminRep(), asesor=S.me.rol==="asesor";
+  const lista=S.cotiz.filter(c=>{ const p=prodById(c.productoId), pl=plantaById(c.plantaId);
+    if(asesor&&c.por!==S.me.usuario) return false;                    // el asesor solo ve lo suyo (el servidor ya lo filtra)
+    if(desde&&String(c.fecha||"")<desde) return false; if(hasta&&String(c.fecha||"")>hasta) return false;
+    if(r.neg&&p?.negocio!==r.neg) return false;
+    if(admin){ if(r.asesor&&c.por!==r.asesor) return false; if(r.mercado&&pl?.mercado!==r.mercado) return false; if(r.comp&&empresaDe(pl)!==r.comp) return false; }
+    return true; });
+  const filas=agruparCot(lista).map(g=>{ const c0=g.items[0], pl0=plantaById(c0.plantaId), T=totalesCot(g);
+    const ok=!T.incompleto&&T.tc>0&&T.td>0, dif=ok?T.td-T.tc:null, pct=ok?(T.td-T.tc)/T.tc:null;
+    return { fecha:c0.fecha||"", ts:Number(c0.ts)||0, cliente:[c0.cliente,c0.proyecto].filter(Boolean).join(" · ")||"—", asesor:nombreDe(c0.por)||c0.por||"",
+      competidor:compNombre(c0,pl0)||"—", mercado:c0.mercado||pl0?.mercado||"",
+      productos:T.lineas.map(l=>nombreCorto(l.nombre)+(l.vol!=null?` · ${fmtN(l.vol)} ${l.unidad}`.trimEnd():"")).join("; "),
+      tc:T.tc||null, td:T.td||null, dif, pct,
+      resultado:!ok?"Sin comparación":pct>0.02?"Más caro":pct<-0.02?"Más barato":"Similar" }; })
+    .sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.ts-a.ts);
+  const caros=filas.filter(f=>f.resultado==="Más caro"), baratos=filas.filter(f=>f.resultado==="Más barato");
+  const tot={ n:filas.length, comparados:filas.filter(f=>f.resultado!=="Sin comparación").length, caros:caros.length, baratos:baratos.length,
+    similares:filas.filter(f=>f.resultado==="Similar").length, sin:filas.filter(f=>f.resultado==="Sin comparación").length,
+    riesgo:caros.reduce((s,f)=>s+f.td,0), sobreprecio:caros.reduce((s,f)=>s+f.dif,0), ahorro:baratos.reduce((s,f)=>s+(f.tc-f.td),0) };
+  return {filas, tot, desde, hasta, admin};
+}
+function repTextos(d){
+  const r=S.rep, per=PERIODOS.find(p=>p[0]===r.periodo)?.[1]||"", rango=d.desde||d.hasta?`${d.desde?fmtDate(d.desde):"inicio"} al ${d.hasta?fmtDate(d.hasta):"hoy"}`:"Todo el histórico";
+  const fil=[`Negocio: ${r.neg?NEGL[r.neg]:"Todos"}`];
+  if(S.me.rol==="asesor") fil.push(`Asesor: ${S.me.nombre}`);
+  else if(d.admin) fil.push(`Asesor: ${r.asesor?nombreDe(r.asesor)||r.asesor:"Todos"}`, `Mercado: ${r.mercado||"Todos"}`, `Competidor: ${r.comp||"Todos"}`);
+  const t=d.tot;
+  return { titulo:"Duracreto · Resumen de proyectos comparados", periodo:`Periodo: ${per} (${rango})`, filtros:fil.join(" · "),
+    generado:`Generado por ${S.me.nombre} el ${fmtDate(today())}`,
+    tot1:`Proyectos comparados: ${t.comparados} de ${t.n} · Más caros: ${t.caros} · Más baratos: ${t.baratos} · Similares: ${t.similares} · Sin comparación: ${t.sin}`,
+    tot2:`Venta en riesgo: ${moneyN(t.riesgo)} · Sobreprecio: ${moneyN(t.sobreprecio)} · Ahorro para el cliente donde somos más baratos: ${moneyN(t.ahorro)}`,
+    pie:"Precios sin ISV. Venta en riesgo: total a precio Duracreto de los proyectos donde estamos más caros (más de 2 %).",
+    archivo:`Resumen_proyectos_${(S.me.rol==="asesor"?S.me.usuario:(d.admin&&S.rep.asesor)||"equipo").replace(/[^A-Za-z0-9_-]+/g,"")}_${d.desde||"inicio"}_${d.hasta||today()}` };
+}
+function renderRep(){
+  const r=S.rep, d=repDatos(), t=d.tot, admin=d.admin;
+  const asesores=[...new Set(S.cotiz.map(c=>c.por).filter(Boolean))].map(id=>({id, n:nombreDe(id)||id})).sort((a,b)=>a.n.localeCompare(b.n,"es"));
+  const comps=[...new Set(S.plantas.filter(p=>p.tipo==="competencia"&&(!r.mercado||p.mercado===r.mercado)&&(!r.neg||(p.negocios||[]).includes(r.neg))).map(empresaDe))].sort((a,b)=>a.localeCompare(b,"es"));
+  const sel=(id,lbl,bind,ops,todos=true)=>`<div class="fld"><label for="precios-${id}">${lbl}</label><select id="precios-${id}" data-bind="${bind}">${todos?`<option value="">Todos</option>`:""}${ops}</select></div>`;
+  const kpi=(l,v,cls)=>`<div class="rep-kpi ${cls||""}"><span class="lbl">${l}</span><b class="num">${v}</b></div>`;
+  return `<div class="scrim" data-act="rep-cerrar"></div>
+  <aside class="drawer rep-panel" role="dialog" aria-label="Resumen de proyectos">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+      <div><span class="lbl">Historial</span><h2>Resumen de proyectos</h2><span class="sub">Una fila por cotización, con los mismos totales de su tarjeta. Precios sin ISV.</span></div>
+      <button class="btn ghost" data-act="rep-cerrar" aria-label="Cerrar">✕</button></div>
+    <div class="form-grid">
+      ${sel("rep-per","Periodo","rep.periodo",PERIODOS.map(([k,l])=>`<option value="${k}" ${r.periodo===k?"selected":""}>${l}</option>`).join(""),false)}
+      ${r.periodo==="rango"?`<div class="fld"><label for="precios-rep-desde">Desde</label><input id="precios-rep-desde" type="date" data-bind="rep.desde" value="${esc(r.desde)}"></div>
+        <div class="fld"><label for="precios-rep-hasta">Hasta</label><input id="precios-rep-hasta" type="date" data-bind="rep.hasta" value="${esc(r.hasta)}"></div>`:""}
+      ${sel("rep-neg","Negocio","rep.neg",negVis().map(n=>`<option value="${n.k}" ${r.neg===n.k?"selected":""}>${n.l}</option>`).join(""))}
+      ${admin?sel("rep-ase","Asesor","rep.asesor",asesores.map(a=>`<option value="${esc(a.id)}" ${r.asesor===a.id?"selected":""}>${esc(a.n)}</option>`).join(""))
+        +sel("rep-merc","Mercado","rep.mercado",allMercados().map(m=>`<option ${r.mercado===m?"selected":""}>${esc(m)}</option>`).join(""))
+        +sel("rep-comp","Competidor","rep.comp",comps.map(c=>`<option value="${esc(c)}" ${r.comp===c?"selected":""}>${esc(c)}</option>`).join("")):""}
+    </div>
+    <div class="rep-acts"><button class="btn primary" data-act="rep-pdf" ${r.busy||!t.n?"disabled":""}>${r.busy==="pdf"?"Preparando PDF…":"Descargar PDF"}</button>
+      <button class="btn" data-act="rep-xlsx" ${r.busy||!t.n?"disabled":""}>${r.busy==="xlsx"?"Preparando Excel…":"Descargar Excel"}</button></div>
+    <div><span class="lbl">Vista previa · ${esc(repTextos(d).periodo.replace(/^Periodo: /,""))}</span>
+      ${t.n?`<div class="rep-kpis">
+        ${kpi("Proyectos comparados",`${t.comparados}<small> de ${t.n}</small>`)}
+        ${kpi("Más caros",t.caros,"caro")}${kpi("Más baratos",t.baratos,"barato")}${kpi("Similares",t.similares)}${kpi("Sin comparación",t.sin)}
+        ${kpi("Venta en riesgo",moneyN(t.riesgo),"caro")}${kpi("Sobreprecio",moneyN(t.sobreprecio),"caro")}${kpi("Ahorro para el cliente",moneyN(t.ahorro),"barato")}
+      </div><p class="note">Venta en riesgo: total a precio Duracreto de los proyectos donde estamos más caros (más de 2 %). Sobreprecio: cuánto más caros somos en esos proyectos. Ahorro: lo que el cliente se ahorra con Duracreto donde somos más baratos.</p>`
+      :`<div class="empty" style="padding:24px 10px"><h3>No hay cotizaciones en este periodo</h3>Cambie el periodo o los filtros.</div>`}
+    </div>
+  </aside>`;
+}
+/* Librerías bajo demanda (cdnjs con respaldo jsDelivr, versión exacta; el service worker las guarda) */
+const LIBS = {
+  jspdf:["https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js","https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"],
+  autotable:["https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js","https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"],
+  xlsx:["https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js","https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"]
+};
+const CARGANDO = {};
+function cargarLib(k, listo){
+  if(listo()) return Promise.resolve();
+  if(CARGANDO[k]) return CARGANDO[k];
+  const intentar=i=>new Promise((ok,mal)=>{ const s=document.createElement("script"); s.src=LIBS[k][i]; s.async=true;
+    s.onload=()=>listo()?ok():mal(new Error("lib")); s.onerror=()=>{ s.remove(); mal(new Error("lib")); }; document.head.appendChild(s); })
+    .catch(e=>{ if(i+1<LIBS[k].length) return intentar(i+1); throw e; });
+  return (CARGANDO[k]=intentar(0).catch(e=>{ delete CARGANDO[k]; throw e; }));
+}
+/* Descarga con Blob: sirve en computadora, en el teléfono y en la app instalada. En iPhone/iPad instalada se ofrece «Compartir» (guardar en Archivos). */
+async function descargarBlob(blob, nombre){
+  const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  if(ios&&navigator.canShare){ try{ const f=new File([blob], nombre, {type:blob.type}); if(navigator.canShare({files:[f]})){ await navigator.share({files:[f], title:nombre}); return; } }catch(e){ if(e&&e.name==="AbortError") return; } }
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=nombre; a.rel="noopener"; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+async function repExportar(tipo){
+  const r=S.rep; if(r.busy) return; r.busy=tipo; rerender();
+  try{
+    const d=repDatos(); if(!d.filas.length){ toast("No hay cotizaciones en este periodo."); return; }
+    if(tipo==="pdf"){ await cargarLib("jspdf",()=>!!(window.jspdf&&window.jspdf.jsPDF)); await cargarLib("autotable",()=>!!(window.jspdf&&window.jspdf.jsPDF&&window.jspdf.jsPDF.API.autoTable)); await descargarBlob(repPDF(d), repTextos(d).archivo+".pdf"); }
+    else { await cargarLib("xlsx",()=>!!(window.XLSX&&window.XLSX.utils)); await descargarBlob(repXLSX(d), repTextos(d).archivo+".xlsx"); }
+  }catch(e){ console.error(e); toast(e&&e.message==="lib"?"No se pudo descargar la herramienta para crear el archivo. Revise la conexión e intente de nuevo.":"No se pudo crear el archivo. Intente de nuevo.", "error"); }
+  finally{ r.busy=""; rerender(); }
+}
+const COLS_REP = admin => [["fecha","Fecha"],["cliente","Cliente / proyecto"],...(admin?[["asesor","Asesor"]]:[]),["competidor","Competidor"],["mercado","Mercado"],["productos","Productos"],
+  ["tc","Total competencia"],["td","Total Duracreto"],["dif","Diferencia L"],["pct","Diferencia %"],["resultado","Resultado"]];
+function repPDF(d){
+  const {jsPDF}=window.jspdf, doc=new jsPDF({orientation:"landscape", unit:"pt", format:"letter"}), T=repTextos(d), W=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), M=36;
+  const m2=v=>v==null?"":Number(v).toLocaleString("es-HN",{minimumFractionDigits:2,maximumFractionDigits:2});
+  doc.setFillColor(249,214,0); doc.rect(0,0,W,6,"F"); doc.setFillColor(244,154,41); doc.rect(W*0.7,0,W*0.3,6,"F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.setTextColor(18,19,15); doc.text(T.titulo, M, 34);
+  doc.setFont("helvetica","normal"); doc.setFontSize(9.5); doc.setTextColor(90,90,86);
+  doc.text(T.periodo, M, 50); doc.text(T.filtros, M, 63); doc.text(T.generado, W-M, 50, {align:"right"});
+  doc.setFillColor(244,244,241); doc.roundedRect(M, 72, W-2*M, 38, 4, 4, "F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(18,19,15); doc.text(T.tot1, M+10, 87); doc.text(T.tot2, M+10, 101);
+  const cols=COLS_REP(d.admin), num=new Set(["tc","td","dif","pct"]);
+  doc.autoTable({
+    startY:120, margin:{left:M, right:M, bottom:40},
+    head:[cols.map(c=>c[1])],
+    body:d.filas.map(f=>cols.map(([k])=>k==="fecha"?fmtDate(f.fecha):num.has(k)?(k==="pct"?pctTxt(f.pct):m2(f[k])):String(f[k]??""))),
+    styles:{font:"helvetica", fontSize:7.6, cellPadding:3.5, overflow:"linebreak", valign:"top", textColor:[18,19,15], lineColor:[220,220,213], lineWidth:0.4},
+    headStyles:{fillColor:[18,19,15], textColor:[249,214,0], fontStyle:"bold", fontSize:7.6},
+    alternateRowStyles:{fillColor:[248,248,245]},
+    columnStyles:Object.fromEntries(cols.map(([k],i)=>[i, num.has(k)?{halign:"right", cellWidth:k==="pct"?46:62}:k==="fecha"?{cellWidth:46}:k==="resultado"?{cellWidth:62, fontStyle:"bold"}:k==="productos"?{cellWidth:"auto"}:{}])),
+    didParseCell:h=>{ if(h.section==="body"&&cols[h.column.index][0]==="resultado"){ const v=h.cell.raw; if(v==="Más caro") h.cell.styles.textColor=[194,55,43]; else if(v==="Más barato") h.cell.styles.textColor=[31,138,76]; else h.cell.styles.textColor=[102,103,95]; } },
+    didDrawPage:()=>{ doc.setFont("helvetica","normal"); doc.setFontSize(7.5); doc.setTextColor(102,103,95); doc.text(T.pie, M, H-20); doc.text(`Página ${doc.internal.getNumberOfPages()}`, W-M, H-20, {align:"right"}); }
+  });
+  return doc.output("blob");
+}
+function repXLSX(d){
+  const X=window.XLSX, T=repTextos(d), cols=COLS_REP(d.admin);
+  const aoa=[[T.titulo],[T.periodo],[T.filtros],[T.generado],[T.tot1],[T.tot2],[],cols.map(c=>c[1])];
+  d.filas.forEach(f=>aoa.push(cols.map(([k])=>k==="fecha"?fmtDate(f.fecha):["tc","td","dif","pct"].includes(k)?(f[k]==null?"":Math.round(f[k]*(k==="pct"?1e6:100))/(k==="pct"?1e6:100)):String(f[k]??""))));
+  aoa.push([], [T.pie]);
+  const ws=X.utils.aoa_to_sheet(aoa);
+  cols.forEach(([k],ci)=>{ if(!["tc","td","dif","pct"].includes(k)) return;
+    for(let ri=8; ri<8+d.filas.length; ri++){ const cell=ws[X.utils.encode_cell({r:ri, c:ci})]; if(cell&&cell.t==="n") cell.z=k==="pct"?"0.0%":"#,##0.00"; } });
+  ws["!cols"]=cols.map(([k])=>({wch:{fecha:11,cliente:34,asesor:20,competidor:22,mercado:18,productos:40,tc:16,td:16,dif:14,pct:12,resultado:15}[k]||14}));
+  ws["!merges"]=[0,1,2,3,4,5].map(r=>({s:{r,c:0}, e:{r,c:cols.length-1}}));
+  const wb=X.utils.book_new(); X.utils.book_append_sheet(wb, ws, "Resumen");
+  const buf=X.write(wb, {bookType:"xlsx", type:"array"});
+  return new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
 }
 
 /* ===== Precios Duracreto ===== */
@@ -679,7 +850,7 @@ function catTramos(){
 
 /* ---------- eventos ---------- */
 function setPath(path, val){ const ks=path.split("."); let o=S; for(let i=0;i<ks.length-1;i++) o=o[ks[i]]; o[ks.at(-1)]=val; }
-function go(v){ S.view=v; S.drawer=null; S.confirmDel=null; try{localStorage.setItem("mv_precios_vista",v);}catch(e){} rerender(); if(MODEL) MODEL.scrollTop=0; }
+function go(v){ S.view=v; S.drawer=null; S.rep.open=false; S.confirmDel=null; try{localStorage.setItem("mv_precios_vista",v);}catch(e){} rerender(); if(MODEL) MODEL.scrollTop=0; }
 
 on("click", async e=>{
   const t=e.target.closest("[data-act]"); if(!t) return; const a=t.dataset.act, v=t.dataset.v, id=t.dataset.id;
@@ -724,8 +895,12 @@ on("click", async e=>{
   if(a==="pl-toggle"){ const p=plantaById(id); try{ await S.db.doc("plantas/"+id).update({activo:p.activo===false}); }catch(err){ fail(err); } return; }
   if(a==="save-tramos") return saveTramos();
   if(a==="csv") return exportCSV();
+  if(a==="rep-abrir"){ S.rep.open=true; S.drawer=null; S.recentOpen=false; return rerender(); }
+  if(a==="rep-cerrar"){ S.rep.open=false; return rerender(); }
+  if(a==="rep-pdf") return repExportar("pdf");
+  if(a==="rep-xlsx") return repExportar("xlsx");
 });
-on("keydown",e=>{ if(e.key==="Escape"&&document.getElementById("precios-mapa-modal")){ cerrarMapa(); return; } if(e.key==="Escape"){ if(S.chat.open){ S.chat.open=false; renderChat(true); } else if(S.drawer||S.recentOpen){ S.drawer=null; S.recentOpen=false; rerender(); } }
+on("keydown",e=>{ if(e.key==="Escape"&&document.getElementById("precios-mapa-modal")){ cerrarMapa(); return; } if(e.key==="Escape"&&S.rep.open){ S.rep.open=false; rerender(); return; } if(e.key==="Escape"){ if(S.chat.open){ S.chat.open=false; renderChat(true); } else if(S.drawer||S.recentOpen){ S.drawer=null; S.recentOpen=false; rerender(); } }
   if(e.key==="Enter"&&!e.shiftKey&&e.target.id==="precios-chat-input"){ e.preventDefault(); chatSend(); } });
 
 /* Las fotos pueden pasar de 20 MB al elegirlas: se reducen antes de subirlas (reducirImagen). */
@@ -736,7 +911,7 @@ function onField(e){
     if(el.dataset.bind==="reg.zona") S.reg.planta="";
     if(el.dataset.bind==="edit.serv"&&val&&S.edit&&!num(S.edit.dcServ)) S.edit.servLista=true;
     if(el.dataset.bind.startsWith("reg.")){ const k=el.dataset.bind.slice(4); if(S.reg.err[k]){ delete S.reg.err[k]; el.classList.remove("bad"); } }
-    if(el.tagName==="SELECT" || el.type==="checkbox"){ if(e.type==="change") rerender(); }
+    if(el.tagName==="SELECT" || el.type==="checkbox" || (el.dataset.bind.startsWith("rep.") && el.type==="date")){ if(e.type==="change") rerender(); }
     else if(e.type==="change") return;
     else if(el.dataset.bind==="reg.recQ") buscarLugar();
     else if(el.dataset.bind==="h.q"||el.dataset.bind==="reg.tempBolsas"||/^reg\.items\.\d+\.(precio|vol)$/.test(el.dataset.bind)) softUpdate(el);

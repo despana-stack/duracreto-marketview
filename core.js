@@ -23,7 +23,7 @@
  */
 (function () {
   'use strict';
-  const VERSION = '1.8.4';              // súbala junto con VERSION en sw.js cada vez que publique cambios
+  const VERSION = '1.8.5';              // súbala junto con VERSION en sw.js cada vez que publique cambios
   const API_URL = String(window.API_URL || '').trim();
   const DEMO = !API_URL;
   const K = { ses: 'mv_sesion', mod: 'mv_modulo', tema: 'mv_tema', tip: 'mv_tip_instalar' };

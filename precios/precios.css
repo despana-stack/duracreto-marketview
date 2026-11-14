@@ -247,6 +247,17 @@
 .precios-raiz .thread small{display:block;color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:250px}
 @media (max-width:640px){.precios-raiz .head h1{font-size:19px}}
 @media (prefers-reduced-motion:reduce){.precios-raiz .chat-hola{animation:none}}
+/* Resumen de proyectos (panel del Historial) */
+.precios-raiz .rep-acts{display:flex;gap:8px;flex-wrap:wrap}
+.precios-raiz .rep-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:8px}
+.precios-raiz .rep-kpi{background:var(--surface2);border:1px solid var(--line);border-radius:var(--p-r);padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.precios-raiz .rep-kpi b{font-size:19px;font-weight:700;color:var(--fg)}
+.precios-raiz .rep-kpi b small{font-size:12px;font-weight:500;color:var(--muted)}
+.precios-raiz .rep-kpi.caro b{color:var(--bad)}
+.precios-raiz .rep-kpi.barato b{color:var(--ok)}
+.precios-raiz .rep-panel .note{margin:8px 0 0}
+.precios-raiz .drawer.rep-panel{padding-bottom:96px}   /* el botón del chat no tapa el final */
+
 /* ---- Ajustes para el cascarón de MarketView ---- */
 /* Capas: encabezado y menú del cascarón = 40; menú de usuario = 60; avisos = 70. */
 .precios-raiz .scrim{z-index:50}
