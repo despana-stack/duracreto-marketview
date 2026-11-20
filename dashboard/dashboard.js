@@ -16,7 +16,6 @@
   let charts = {}, libChart = null, tBusca = 0, rafTema = 0, cargando = false;
   let generacion = 0;                            // sube en desmontar(): una carga que vuelve después ya no dibuja
   const est = { periodo: null, vista: 'L', unidad: null, q: '', estado: '', unidadF: '', asesor: '', pagina: 0 };
-  const mqCel = window.matchMedia('(max-width: 759px)');
   const mqMov = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   /* ===================== Utilidades ===================== */
@@ -147,37 +146,8 @@
     }
     const c = colores();
     window.Chart.defaults.font.family = getComputedStyle(raiz).fontFamily;
-    graficoUnidades(c);
     graficoTendencia(c);
     graficoPlantas(c);
-  }
-
-  function graficoUnidades(c) {
-    if (est.vista === 'V') return;                       // en volumen cada unidad tiene su propia medida: van como barras de avance
-    const us = D().unidades || [], per = est.periodo, hz = mqCel.matches;
-    const val = k => us.map(u => (u[per] && num(u[per][k])) ? u[per][k] : 0);
-    const barra = { borderRadius: 4, borderSkipped: 'start', maxBarThickness: 16, categoryPercentage: 0.78, barPercentage: 0.9, borderWidth: 0 };
-    const op = opcionesBase(c, hz);
-    op.plugins.tooltip.callbacks = { label: x => ' ' + x.dataset.label + ': ' + fmtLc(x.raw) };
-    grafico('unidades', {
-      type: 'bar',
-      data: {
-        labels: us.map(u => hz ? u.nombre : partir(u.nombre)),
-        datasets: [
-          Object.assign({ label: 'Facturado', data: val('facturado'), backgroundColor: c.fact }, barra),
-          Object.assign({ label: 'Perspectivas (ganado)', data: val('persp_total'), backgroundColor: c.persp }, barra),
-          Object.assign({ label: 'Meta', data: val('meta'), backgroundColor: c.meta }, barra)
-        ]
-      },
-      options: Object.assign(op, { indexAxis: hz ? 'y' : 'x' })
-    });
-  }
-  /** Nombres largos en dos líneas bajo las barras verticales. */
-  function partir(t) {
-    const p = String(t).split(' ');
-    if (p.length < 2 || t.length < 12) return t;
-    const mitad = Math.ceil(p.length / 2);
-    return [p.slice(0, mitad).join(' '), p.slice(mitad).join(' ')];
   }
 
   /** Mes que se dibuja en «Facturación acumulada»: el del periodo; en Nov+Dic, el último que ya tiene facturación. */
@@ -385,28 +355,53 @@
       <button type="button" data-acc="notas">Ver notas</button></div>`;
   }
 
+  /**
+   * Unidades de negocio: una barra de avance por unidad (HTML/CSS, sin Chart.js).
+   * Escala de cada fila = max(meta, facturado + perspectivas ganadas). Tramo 1 = facturado; tramo 2 = perspectivas ganadas
+   * (juntos = proyección de cierre); línea fina = ritmo esperado al corte × meta; línea punteada = meta, si la proyección la supera.
+   */
   function seccionUnidades() {
-    if (est.vista === 'V') {
-      const filas = unidadesVol().map(u => {
-        const t = (u.totales && u.totales[est.periodo]) || {}, c = claseEstatus(t, t.avance);
-        const pf = num(t.meta) && t.meta ? t.facturado / t.meta : null, pp = num(t.meta) && t.meta ? t.proyeccion / t.meta : null;
-        return `<button type="button" class="dash-uv${u.nombre === est.unidad ? ' sel' : ''}" data-acc="unidad" data-v="${esc(u.nombre)}">
-          <span class="dash-uv-n">${esc(u.nombre)}</span>${chipEstatus(t, t.avance)}
-          <span class="dash-doble" aria-hidden="true"><i class="p" style="width:${Math.min(100, (pp || 0) * 100)}%"></i><i class="f" style="width:${Math.min(100, (pf || 0) * 100)}%"></i></span>
-          <span class="dash-uv-c">Facturado <b>${fmtN(t.facturado, u.um)}</b> · Proyección ${fmtN(t.proyeccion, u.um)} · Meta ${fmtN(t.meta, u.um)} · <b>${fmtPct(t.cumpl_facturado)}</b></span>
-        </button>`;
-      }).join('');
-      return `<section class="mv-card dash-sec"><h2>Unidades de negocio <small>volumen, cada una en su medida</small></h2>
-        <div class="dash-leyenda"><span><i class="f"></i>Facturado</span><span><i class="p"></i>Proyección de cierre</span><span>Barra completa = meta</span></div>
-        <div class="dash-uvs">${filas}</div></section>`;
-    }
-    const us = D().unidades || [];
-    const alto = mqCel.matches ? Math.max(260, us.length * 66) : 320;
-    const chips = us.map(u => { const t = u[est.periodo] || {};
-      return `<li><span>${esc(u.nombre)}</span><b>${u.con_meta === false ? 'sin meta' : fmtPct(t.cumpl_facturado)}</b>${u.con_meta === false ? '' : chipEstatus(t, totales().avance)}</li>`; }).join('');
-    return `<section class="mv-card dash-sec"><h2>Unidades de negocio</h2>
-      <div class="dash-lienzo" style="height:${alto}px"><canvas data-graf="unidades" role="img" aria-label="Facturado, perspectivas y meta por unidad de negocio"></canvas></div>
-      <ul class="dash-cumpl">${chips}</ul></section>`;
+    const vol = est.vista === 'V', per = est.periodo;
+    const avance = totales().avance;               // el mismo % de «Ritmo esperado al corte» de la tarjeta Cumplimiento
+    const filas = (vol
+      ? unidadesVol().map(u => ({ nombre: u.nombre, um: u.um, t: (u.totales && u.totales[per]) || {}, conMeta: true }))
+      : (D().unidades || []).map(u => ({ nombre: u.nombre, um: '', t: u[per] || {}, conMeta: u.con_meta !== false }))
+    ).map(f => {
+      // Orden por meta en lempiras (en Volumen las medidas se mezclan: m³ y unidades no se pueden comparar)
+      const uL = (D().unidades || []).find(u => u.nombre === f.nombre), mL = uL && uL[per] && uL[per].meta;
+      return Object.assign(f, { conMeta: !!(f.conMeta && num(f.t.meta) && f.t.meta > 0), orden: num(mL) ? mL : (f.t.meta || 0) });
+    }).sort((a, b) => (b.conMeta - a.conMeta) || (b.orden - a.orden));
+    const fv = (v, um) => vol ? fmtN(v, um) : fmtL(v);
+    let hayMeta = false;
+    const html = filas.map(f => {
+      const t = f.t, fac = num(t.facturado) ? t.facturado : 0, per_ = num(t.persp_total) ? t.persp_total : 0;
+      const sel = vol && f.nombre === est.unidad ? ' sel' : '';
+      const acc = vol ? `data-acc="unidad" data-v="${esc(f.nombre)}"` : 'data-acc="ufila"';
+      if (!f.conMeta) {
+        return `<button type="button" class="dash-un sin-meta${sel}" ${acc}>
+          <span class="dash-un-n">${esc(f.nombre)}</span><span class="dash-un-c"><b>sin meta</b></span>
+          <span class="dash-un-s">${num(t.facturado) ? fv(t.facturado, f.um) + ' facturado' : 'Sin facturación'}${per_ ? ' · + ' + fv(per_, f.um) + ' en perspectivas' : ''}</span></button>`;
+      }
+      const meta = t.meta, escala = Math.max(meta, fac + per_) || 1, pc = v => (Math.max(0, v) / escala * 100).toFixed(2) + '%';
+      const ritmo = num(avance) ? avance * meta : null, pasa = fac + per_ > meta;
+      if (pasa) hayMeta = true;
+      const tip = `<span class="dash-un-tip" role="tooltip">
+          <span><i class="f"></i>Facturado<b>${num(t.facturado) ? fv(t.facturado, f.um) : '—'}</b></span>
+          <span><i class="p"></i>Perspectivas ganadas<b>${fv(per_, f.um)}</b></span>
+          <span>Proyección de cierre<b>${fv(fac + per_, f.um)}</b></span>
+          <span>Meta<b>${fv(meta, f.um)}</b></span>
+          <span>Ritmo esperado al corte<b>${num(ritmo) ? fv(ritmo, f.um) + ' (' + fmtPct(avance) + ')' : '—'}</b></span></span>`;
+      return `<button type="button" class="dash-un${sel}" ${acc} aria-label="${esc(f.nombre)}: ${esc(fmtPct(t.cumpl_facturado))} de la meta">
+        <span class="dash-un-n">${esc(f.nombre)}${vol ? ` <small>${esc(f.um)}</small>` : ''}</span>
+        <span class="dash-un-b" aria-hidden="true"><span class="pista"><i class="f" style="width:${pc(fac)}"></i><i class="p" style="left:${pc(fac)};width:${pc(per_)}"></i></span>
+          ${num(ritmo) ? `<em class="ritmo" style="left:${pc(ritmo)}"></em>` : ''}${pasa ? `<em class="meta" style="left:${pc(meta)}"></em>` : ''}</span>
+        <span class="dash-un-c"><b>${fmtPct(t.cumpl_facturado)}</b>${chipEstatus(t, avance)}</span>
+        <span class="dash-un-s">${num(t.facturado) ? fv(t.facturado, f.um) + ' de ' : 'Meta '}${fv(meta, f.um)}${per_ ? ' · + ' + fv(per_, f.um) + ' en perspectivas' : ''}</span>
+        ${tip}</button>`;
+    }).join('');
+    return `<section class="mv-card dash-sec"><h2>Unidades de negocio${vol ? ' <small>volumen, cada una en su medida · toque una para verla arriba</small>' : ''}</h2>
+      <div class="dash-un-ley"><span><i class="f"></i>Facturado</span><span><i class="p"></i>Perspectivas ganadas</span>${num(avance) ? '<span><i class="r"></i>Ritmo esperado al corte</span>' : ''}${hayMeta ? '<span><i class="m"></i>Meta</span>' : ''}</div>
+      <div class="dash-uns">${html}</div></section>`;
   }
 
   function seccionZonas() {
@@ -582,6 +577,9 @@
   /* ===================== Eventos ===================== */
   function alClic(e) {
     const b = e.target.closest('[data-acc]');
+    const fila = b && b.classList.contains('dash-un') && (b.dataset.acc === 'ufila' || (b.dataset.acc === 'unidad' && b.dataset.v === est.unidad)) ? b : null;
+    raiz.querySelectorAll('.dash-un.abierta').forEach(x => { if (x !== fila) x.classList.remove('abierta'); });
+    if (fila) { fila.classList.toggle('abierta'); return; }   // tocar una unidad: aviso con el detalle
     if (!b || !raiz.contains(b)) return;
     const acc = b.dataset.acc, v = b.dataset.v;
     if (acc === 'reintentar') { P = null; cargar(false); }
@@ -613,8 +611,6 @@
   }
   // Cambio de tema: los colores del lienzo se vuelven a leer de las variables CSS.
   function alTema() { cancelAnimationFrame(rafTema); rafTema = requestAnimationFrame(dibujarGraficos); }
-  // Cruce celular ↔ computadora: las barras de unidades cambian de orientación.
-  function alCambiarAncho() { if (P && raiz) pintar(); }
 
   MV.registrar('dashboard', {
     relleno: true,
@@ -624,7 +620,6 @@
       el.addEventListener('change', alCambiar);
       el.addEventListener('input', alEscribir);
       window.addEventListener('mv:tema', alTema);
-      mqCel.addEventListener('change', alCambiarAncho);
       await cargar(false);
     },
     mostrar(ctx) {
@@ -638,7 +633,6 @@
       cerrarPanel(); destruirGraficos();
       clearTimeout(tBusca); cancelAnimationFrame(rafTema);
       window.removeEventListener('mv:tema', alTema);
-      mqCel.removeEventListener('change', alCambiarAncho);
       if (raiz) {
         raiz.removeEventListener('click', alClic); raiz.removeEventListener('change', alCambiar); raiz.removeEventListener('input', alEscribir);
         raiz.innerHTML = '';
