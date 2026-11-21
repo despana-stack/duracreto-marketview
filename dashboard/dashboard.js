@@ -336,7 +336,7 @@
       ${kpi('Cumplimiento' + um, fmtPct(t.cumpl_facturado), num(t.avance) ? 'Ritmo esperado al corte: ' + fmtPct(t.avance) : 'Facturado ÷ meta forecast', chipEstatus(t, t.avance) + barraAv, 'dash-kpi-cumpl ' + c)}
       ${kpi('Meta forecast', fmtV(t.meta), est.vista === 'V' ? 'Cantidad del forecast oficial' : 'Forecast oficial de Presidencia')}
       ${kpi('Facturado real', sinFact ? '—' : fmtV(t.facturado), sinFact ? 'Sin facturación todavía' : (num(t.documentos) ? nf(t.documentos) + ' documentos' : 'Reporte de ventas SAP'))}
-      ${kpi('Perspectivas', fmtV(t.persp_total), (num(t.n_ganado) ? nf(t.n_ganado) + ' ganados' : 'Ganados') + (num(t.perspectiva) && t.perspectiva ? ' · ' + fmtV(t.perspectiva) + ' en negociación' : ''))}
+      ${kpi('Perspectivas ganadas', fmtV(t.ganado), (num(t.n_ganado) ? nf(t.n_ganado) + ' ganados' : 'Ganados') + (num(t.perspectiva) && t.perspectiva ? ' · ' + fmtV(t.perspectiva) + ' en negociación' : ''))}
       ${kpi('Proyección de cierre', fmtV(t.proyeccion), num(t.cumpl_proyeccion) ? fmtPct(t.cumpl_proyeccion) + ' de la meta' : 'Facturado + perspectivas')}
     </section>`;
   }
@@ -463,6 +463,8 @@
   const montoPer = p => est.periodo === 's4' ? sumaN(p.monto_nov, p.monto_dic) : p['monto_' + est.periodo];
   function sumaN(a, b) { return num(a) || num(b) ? (num(a) ? a : 0) + (num(b) ? b : 0) : null; }
   const CLASE_ESTADO = { ganado: 'ok', perspectiva: 'info', competencia: 'bad' };
+  /** Texto en pantalla del estado: «Perspectiva» (proyecto aún no ganado) se muestra «En negociación»; el dato no cambia. */
+  const etiquetaEstado = e => String(e || '').toLowerCase() === 'perspectiva' ? 'En negociación' : (e || 'Sin estado');
   const claseEstado = e => CLASE_ESTADO[String(e || '').toLowerCase()] || 'neutro';
 
   function seccionProyectos() {
@@ -471,14 +473,14 @@
     ps.forEach(p => { const e = p.estado || 'Sin estado'; (grupos[e] = grupos[e] || { n: 0, m: 0 }); grupos[e].n++; grupos[e].m += montoPer(p) || 0; });
     const orden = ['Ganado', 'Perspectiva', 'Competencia'];
     const estados = Object.keys(grupos).sort((a, b) => (orden.indexOf(a) + 1 || 9) - (orden.indexOf(b) + 1 || 9));
-    const opciones = (lista, actual, todos) => `<option value="">${todos}</option>` + lista.map(x => `<option value="${esc(x)}"${x === actual ? ' selected' : ''}>${esc(x)}</option>`).join('');
+    const opciones = (lista, actual, todos, est_) => `<option value="">${todos}</option>` + lista.map(x => `<option value="${esc(x)}"${x === actual ? ' selected' : ''}>${esc(est_ ? etiquetaEstado(x) : x)}</option>`).join('');
     const unicos = k => [...new Set(ps.map(p => p[k]).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
     return `<section class="mv-card dash-sec dash-proy"><h2>Perspectivas y proyectos <small>${ps.length} proyectos · montos de ${esc(CORTO[est.periodo] || est.periodo)}</small></h2>
       <div class="dash-chips">${estados.map(e => `<button type="button" class="dash-chip ${claseEstado(e)}" data-acc="estado" data-v="${esc(e)}" aria-pressed="${est.estado === e}">
-        <i></i>${esc(e)} <b>${grupos[e].n}</b><span>${fmtL(grupos[e].m)}</span></button>`).join('')}</div>
+        <i></i>${esc(etiquetaEstado(e))} <b>${grupos[e].n}</b><span>${fmtL(grupos[e].m)}</span></button>`).join('')}</div>
       <div class="dash-filtros">
         <input class="mv-input dash-q" type="search" placeholder="Buscar cliente, proyecto o producto" value="${esc(est.q)}" aria-label="Buscar proyectos">
-        <select class="mv-input" data-filtro="estado" aria-label="Estado">${opciones(estados, est.estado, 'Todos los estados')}</select>
+        <select class="mv-input" data-filtro="estado" aria-label="Estado">${opciones(estados, est.estado, 'Todos los estados', true)}</select>
         <select class="mv-input" data-filtro="unidadF" aria-label="Unidad">${opciones(unicos('unidad'), est.unidadF, 'Todas las unidades')}</select>
         <select class="mv-input" data-filtro="asesor" aria-label="Asesor">${opciones(unicos('asesor'), est.asesor, 'Todos los asesores')}</select>
       </div>
@@ -499,7 +501,7 @@
       <div class="dash-pr-p" role="cell"><b>${esc(p.proyecto || '—')}</b>${al}<small>${esc(p.cliente || '')}</small></div>
       <div class="dash-pr-a" role="cell">${esc(p.asesor || '—')}<small>${esc(p.zona || '')}</small></div>
       <div class="dash-pr-u" role="cell">${esc(p.unidad || '—')}<small>${esc(p.producto || '')}${p.planta ? ' · ' + esc(p.planta) : ''}</small></div>
-      <div class="dash-pr-e" role="cell"><span class="dash-badge ${claseEstado(p.estado)}">${esc(p.estado || 'Sin estado')}</span>${p.competidor ? `<small>${esc(p.competidor)}</small>` : ''}</div>
+      <div class="dash-pr-e" role="cell"><span class="dash-badge ${claseEstado(p.estado)}">${esc(etiquetaEstado(p.estado))}</span>${p.competidor ? `<small>${esc(p.competidor)}</small>` : ''}</div>
       <div class="dash-pr-v" role="cell"><span class="dash-et">Volumen</span>${fmtN(volPer(p), p.um)}</div>
       <div class="dash-pr-r" role="cell"><span class="dash-et">Precio</span>${num(p.precio) ? fmtLc(p.precio) : '—'}</div>
       <div class="dash-pr-m" role="cell"><span class="dash-et">Monto</span><b>${fmtLc(montoPer(p))}</b></div>
