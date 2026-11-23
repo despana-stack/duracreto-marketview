@@ -379,7 +379,7 @@ function pintarSeguimiento() {
       </tbody>
       <tfoot><tr><th>Equipo</th><th></th><th class="num">${s.equipo.proyectos}</th><th class="num">${s.equipo.nuevos}</th><th class="num">${s.equipo.actualizados}</th><th class="num">${s.equipo.sinUbicar}</th><th class="num">${s.equipo.sinTocar}</th></tr></tfoot>
     </table></div>
-    <p class="leido"><span class="sem verde"></span> entró y movió sus proyectos en la semana · <span class="sem amarillo"></span> entró pero no actualizó · <span class="sem rojo"></span> no entró. «Último ingreso» puede tardar hasta 6 horas en reflejarse. Cada lunes a las 7 a. m. llega este resumen por correo.</p>`;
+    <p class="leido"><span class="sem verde"></span> entró y movió sus proyectos en la semana · <span class="sem amarillo"></span> entró pero no actualizó · <span class="sem rojo"></span> no entró. «Último ingreso» puede tardar hasta 6 horas en reflejarse. Cada sábado a las 8 a. m. llega este resumen por correo.</p>`;
   }
   RAIZ.innerHTML = `<div class="proy-raiz"><div class="pagina-in">
     <div class="pag-h"><div><h1>Proyectos</h1><p>Seguimiento del uso de la app por asesor.</p></div>${V.segCargando && s ? '<span class="nota"><span class="mv-giro"></span> Actualizando…</span>' : ''}</div>
