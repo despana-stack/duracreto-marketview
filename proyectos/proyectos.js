@@ -353,6 +353,7 @@ function detalle(p) {
       ${ed ? `<div class="estsel" role="group" aria-label="Estado">${['perspectiva', 'ganado', 'competencia', 'perdido'].map(k => `<button type="button" data-est-p="${esc(p.id)}" data-est-v="${k}" aria-pressed="${ek === k}"><i class="e-${k}"></i>${estadoN(k)}</button>`).join('')}</div>` : ''}
       <span style="flex:1"></span>
       ${p.lat != null && verMapa() ? `<button type="button" class="mv-btn" data-ver="${esc(p.id)}">Ver en mapa</button>` : ''}
+      ${ed ? `<button type="button" class="mv-btn" data-eliminar="${esc(p.id)}" style="color:var(--bad);border-color:var(--bad)">Eliminar</button>` : ''}
       ${ed ? `<button type="button" class="mv-btn primario" data-editar="${esc(p.id)}">Editar</button>` : ''}
     </div></div>`;
 }
@@ -416,6 +417,7 @@ function eventosLista() {
         pintar(); return;
       }
       if (b.dataset.editar) { abrirFormulario(p(b.dataset.editar)); return; }
+      if (b.dataset.eliminar) { eliminarProyecto(p(b.dataset.eliminar)); return; }
       if (b.dataset.ver) { CTX.abrir('mapa', { id: b.dataset.ver }); return; }
       if (b.dataset.estP) {
         const pr = p(b.dataset.estP), k = b.dataset.estV; if (!pr || estadoK(pr.estado) === k) return;
@@ -485,6 +487,46 @@ function pedirCompetidor(actual) {
     $('dlg-ok').onclick = () => { const v = sel.value === '__otro' ? otro.value.trim() : sel.value; if (!v) { $('dlg-err').textContent = 'Elija o escriba el competidor.'; return; } fin(v); };
     sel.focus();
   });
+}
+/* ---------- Eliminar un proyecto (p. ej. duplicado) ----------
+   No se borra: el servidor lo pasa a la pestaña «Proyectos – archivo» con quién, cuándo y por qué. */
+const MOTIVOS_BAJA = ['Duplicado', 'Registrado por error', 'Cancelado / ya no se hará', 'Otro'];
+function pedirMotivoBaja(pr) {
+  flotantes();
+  return new Promise(res => {
+    const dlg = FP.dlg;
+    dlg.innerHTML = `<div class="dlg-c" role="alertdialog" aria-modal="true" aria-labelledby="proy-baja-t"><h3 id="proy-baja-t">Eliminar «${esc(pr.proyecto || pr.id)}»</h3>
+      <p class="nota">${esc(pr.cliente || '')}${pr.cliente ? ' · ' : ''}${esc(pr.id)}. Dejará de aparecer en su lista y en el mapa.</p>
+      <label class="fld"><span>Motivo</span><select id="proy-baja-mot" class="mv-input"><option value="">Elija el motivo</option>${MOTIVOS_BAJA.map(m => `<option>${m}</option>`).join('')}</select></label>
+      <input type="text" id="proy-baja-nota" class="mv-input" placeholder="Opcional: ¿cuál es el proyecto que se queda?" hidden>
+      <span class="err" id="proy-baja-err"></span>
+      <div class="fila-b" style="justify-content:flex-end"><button type="button" class="mv-btn" id="proy-baja-no">Cancelar</button><button type="button" class="mv-btn primario" id="proy-baja-si" style="background:var(--bad);border-color:var(--bad);color:#fff">Eliminar</button></div></div>`;
+    dlg.hidden = false;
+    const sel = $('baja-mot'), nota = $('baja-nota');
+    sel.onchange = () => { nota.hidden = !sel.value || sel.value === 'Registrado por error'; nota.placeholder = sel.value === 'Duplicado' ? 'Opcional: ¿cuál es el proyecto que se queda?' : sel.value === 'Otro' ? 'Escriba el motivo' : 'Opcional: comentario'; };
+    const fin = v => { dlg.hidden = true; dlg.innerHTML = ''; document.removeEventListener('keydown', esc1); res(v); };
+    const esc1 = e => { if (e.key === 'Escape') fin(null); };
+    document.addEventListener('keydown', esc1);
+    dlg.onclick = e => { if (e.target === dlg) fin(null); };
+    $('baja-no').onclick = () => fin(null);
+    $('baja-si').onclick = () => {
+      const m = sel.value, n = nota.hidden ? '' : nota.value.trim();
+      if (!m) { $('baja-err').textContent = 'Elija el motivo.'; return; }
+      if (m === 'Otro' && !n) { $('baja-err').textContent = 'Escriba el motivo.'; return; }
+      fin({ motivo: m, nota: n });
+    };
+    sel.focus();
+  });
+}
+async function eliminarProyecto(pr, desdeFormulario) {
+  if (!pr || !puedeEditar()) return;
+  const r0 = await pedirMotivoBaja(pr); if (!r0) return;
+  try {
+    const r = await CTX.api('proyectos.eliminar', { id: pr.id, motivo: r0.motivo, nota: r0.nota });
+    if (desdeFormulario) cerrarFormulario();
+    aplicar(r.datos); avisarCambio();
+    aviso(`Se eliminó «${pr.proyecto || pr.id}».`);
+  } catch (e) { aviso(e.message || 'No se pudo eliminar.', 'error'); }
 }
 /* Confirmación simple (sí / no) */
 function confirmar(titulo, texto, si) {
@@ -557,7 +599,7 @@ function pintarFormulario() {
     <div class="fld"><label for="proy-fp-notas">Notas (opcional)</label><textarea class="mv-input" id="proy-fp-notas" placeholder="Ej. losas y pavimento; decide el ingeniero residente">${esc(d.notas)}</textarea></div>
     ${FP.p && FP.p.hist ? `<details><summary class="nota" style="cursor:pointer">Historial de cambios</summary><p class="nota" style="white-space:pre-line;margin-top:6px">${esc(FP.p.hist)}</p></details>` : ''}
     <span class="err" id="proy-fp-err"></span>
-    <div class="fp-pie"><button type="button" class="mv-btn" data-fp="cerrar">Cancelar</button><button type="button" class="mv-btn primario" data-fp="guardar">${FP.p ? 'Guardar cambios' : 'Registrar proyecto'}</button></div>`;
+    <div class="fp-pie">${FP.p ? `<button type="button" class="mv-btn" data-fp="eliminar" style="margin-right:auto;color:var(--bad);border-color:var(--bad)">Eliminar</button>` : ''}<button type="button" class="mv-btn" data-fp="cerrar">Cancelar</button><button type="button" class="mv-btn primario" data-fp="guardar">${FP.p ? 'Guardar cambios' : 'Registrar proyecto'}</button></div>`;
   pintarLineas();
 }
 function opcionesCatalogo(sel) {
@@ -748,6 +790,7 @@ async function clicFormulario(ev) {
   }
   const a = b.dataset.fp;
   if (a === 'cerrar') { cerrarFormulario(); return; }
+  if (a === 'eliminar') { if (FP.p) eliminarProyecto(FP.p, true); return; }
   if (a === 'buscar') {
     const t = $('fp-ref').value.trim(); if (t.length < 3) { aviso('Escriba al menos 3 letras de la dirección.'); return; }
     if (pareceUbicacion(t)) { ubicarDesdeTexto(t, b); return; }
