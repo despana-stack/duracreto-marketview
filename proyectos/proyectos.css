@@ -219,3 +219,40 @@
 .proy-drawer .cuadre .nota{font-size:11.5px}
 .proy-drawer .cuadre-acc{display:flex;flex-wrap:wrap;gap:8px}
 .proy-drawer .cuadre-acc .mv-btn{height:auto;min-height:38px;padding:7px 12px;font-size:12.5px;text-align:left;white-space:normal}
+
+/* ---------- Pestañas Listado / Seguimiento (1.9.2) ---------- */
+.proy-raiz .proy-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:4px 0 2px}
+.proy-raiz .proy-tabs button{border:0;background:none;padding:10px 14px;font-weight:600;font-size:14px;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px;cursor:pointer}
+.proy-raiz .proy-tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--yellow)}
+/* ---------- Filtro de meses (selección múltiple) ---------- */
+.proy-raiz .mes-fld{position:relative}
+.proy-raiz .mes-sel>summary{list-style:none;cursor:pointer;display:flex;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.proy-raiz .mes-sel>summary::-webkit-details-marker{display:none}
+.proy-raiz .mes-sel>summary::after{content:'▾';margin-left:auto;padding-left:8px;color:var(--muted)}
+.proy-raiz .mes-pop{position:absolute;z-index:30;top:calc(100% + 6px);left:0;width:min(330px,88vw);background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.18);padding:12px;display:flex;flex-direction:column;gap:10px}
+.proy-raiz .mes-rap{display:flex;gap:6px;flex-wrap:wrap}
+.proy-raiz .mes-rap button{border:1px solid var(--line);background:var(--surface2);border-radius:999px;padding:5px 10px;font-size:12.5px;cursor:pointer;color:var(--fg)}
+.proy-raiz .mes-anio b{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+.proy-raiz .mes-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.proy-raiz .mes-b{border:1px solid var(--line);background:none;border-radius:8px;padding:6px 0;font-size:12.5px;cursor:pointer;color:var(--fg);text-transform:capitalize}
+.proy-raiz .mes-b.hoy{border-color:var(--fg)}
+.proy-raiz .mes-b[aria-pressed="true"]{background:var(--yellow);border-color:var(--yellow);color:var(--ink);font-weight:700}
+.proy-raiz .mes-pie{display:flex;align-items:center;justify-content:space-between;gap:8px}
+/* ---------- Seguimiento ---------- */
+.proy-raiz .seg-top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 20px;padding:14px}
+.proy-raiz .seg-top .fld{min-width:200px}
+.proy-raiz .seg-top .nota{flex-basis:100%;margin:0}
+.proy-raiz .seg-res{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13.5px;padding-bottom:8px}
+.proy-raiz .sem{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 4px 0 6px;vertical-align:middle}
+.proy-raiz .sem.verde{background:var(--ok)}.proy-raiz .sem.amarillo{background:var(--warn)}.proy-raiz .sem.rojo{background:var(--bad)}
+.proy-raiz .seg-n{border:0;background:none;font:inherit;font-weight:600;color:var(--fg);cursor:pointer;padding:0;text-align:left;display:flex;align-items:center}
+.proy-raiz .seg-n .sem{margin:0 8px 0 0}
+.proy-raiz .seg-t td.alerta{color:var(--bad);font-weight:700}
+.proy-raiz .seg-t tfoot th{text-align:left;padding:10px 12px;border-top:2px solid var(--line)}
+.proy-raiz .seg-t tfoot th.num{text-align:right}
+.proy-raiz .seg-pend{display:flex;flex-direction:column;gap:6px;padding:4px 0}
+.proy-raiz .seg-pend .sp{display:flex;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.proy-raiz .seg-pend .sp>div{flex:1;min-width:0}
+.proy-raiz .seg-pend .sp b{display:block;font-size:13.5px}
+.proy-raiz .seg-pend .sp small{color:var(--muted);font-size:12px}
+.proy-raiz .seg-pend .sp-m{font-size:12px;color:var(--warn);text-align:right}

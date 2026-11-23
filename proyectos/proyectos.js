@@ -165,7 +165,7 @@ const R = {
 /* ---------- estado del módulo ---------- */
 let CTX = null, RAIZ = null, D = null, refrescando = null;
 const V = { visible: true, sucio: false, cargado: 0, abierto: '', tm: false, orden: { col: 'rango', dir: -1 } };
-const F = { q: '', asesor: '', zona: '', seg: '', prod: '', estados: new Set(), desde: '', hasta: '' };
+const F = { q: '', asesor: '', zona: '', seg: '', prod: '', estados: new Set(), meses: new Set() };   // meses: 'AAAA-MM' elegidos (por defecto, el mes en curso)
 const FP = { p: null, d: null, map: null, marca: null, lugares: [], el: null, scrim: null, dlg: null };
 const vivo = () => !!(RAIZ && RAIZ.isConnected);
 const miNombre = () => (D && (D.miNombre || D.miAsesor)) || (CTX && CTX.usuario.nombre) || '';
@@ -184,7 +184,7 @@ function aplicar(d) {
   if (!d) return;
   D = d; V.cargado = Date.now();
   if (d.mesActual) R.hoy = d.mesActual;
-  if (!F.desde) { F.desde = R.hoy; F.hasta = sumarMes(R.hoy, 5); }
+  if (!F.meses.size) F.meses.add(R.hoy);
   if (vivo() && (!FP.el || FP.el.hidden)) pintar();
 }
 /* Avisa al mapa que la base cambió, para que se actualice al volver. */
@@ -207,7 +207,7 @@ function lineaEnFiltro(l) {
 }
 function enRango(l) {
   let s = 0;
-  Object.keys(l.m || {}).forEach(k => { if (k >= F.desde && k <= F.hasta) s += Number(l.m[k]) || 0; });
+  Object.keys(l.m || {}).forEach(k => { if (F.meses.has(k)) s += Number(l.m[k]) || 0; });
   return s;
 }
 /** Proyectos que pasan los filtros (sin contar el rango), con sus cantidades en el rango por negocio. */
@@ -258,18 +258,41 @@ function opcionesMes(sel, desde, hasta) {
   while (k <= hasta) { h += `<option value="${k}"${k === sel ? ' selected' : ''}>${fmtMes(k)}</option>`; k = sumarMes(k, 1); }
   return h;
 }
+/* ---------- Filtro de meses (selección múltiple) ---------- */
+const mesesSel = () => [...F.meses].sort();
+function textoMeses() {
+  const ks = mesesSel(); if (!ks.length) return '—';
+  if (ks.length === 1) return fmtMes(ks[0]);
+  const seguidos = ks.every((k, i) => !i || sumarMes(ks[i - 1], 1) === k);
+  return seguidos ? fmtMesCorto(ks[0]) + ' a ' + fmtMesCorto(ks[ks.length - 1]) : ks.length <= 3 ? ks.map(fmtMesCorto).join(', ') : ks.length + ' meses';
+}
+function selectorMeses() {
+  const ini = sumarMes(R.hoy, -12), anios = {}; let k = ini;
+  for (let i = 0; i < 37; i++) { (anios[k.slice(0, 4)] = anios[k.slice(0, 4)] || []).push(k); k = sumarMes(k, 1); }
+  return `<div class="fld mes-fld"><span>Mes</span><details class="mes-sel"${V.mesAbierto ? ' open' : ''}><summary class="mv-input">${esc(textoMeses())}</summary>
+    <div class="mes-pop" role="group" aria-label="Meses">
+      <div class="mes-rap"><button type="button" data-mes-rap="hoy">Solo este mes</button><button type="button" data-mes-rap="sig3">Próximos 3</button><button type="button" data-mes-rap="anio">Este año</button></div>
+      ${Object.keys(anios).map(a => `<div class="mes-anio"><b>${a}</b><div class="mes-grid">${anios[a].map(m => `<button type="button" class="mes-b${m === R.hoy ? ' hoy' : ''}" data-mes="${m}" aria-pressed="${F.meses.has(m)}">${MESES[Number(m.slice(5)) - 1].slice(0, 3)}</button>`).join('')}</div></div>`).join('')}
+      <div class="mes-pie"><span class="nota">Toque varios para sumarlos.</span><button type="button" class="mv-btn primario" data-mes-rap="listo">Listo</button></div>
+    </div></details></div>`;
+}
 function nFiltros() { return [F.q, F.asesor, F.zona, F.seg, F.prod, F.estados.size].filter(Boolean).length; }
 
 /* ---------- listado ---------- */
+function pestanas() {
+  if (!D.seguimiento) return '';
+  return `<div class="proy-tabs" role="tablist"><button type="button" role="tab" data-vista="listado" aria-selected="${V.vista !== 'seguimiento'}">Listado</button><button type="button" role="tab" data-vista="seguimiento" aria-selected="${V.vista === 'seguimiento'}">Seguimiento</button></div>`;
+}
 function pintar() {
   if (!vivo() || !D) return;
+  if (V.vista === 'seguimiento' && D.seguimiento) { pintarSeguimiento(); return; }
   const rows = filas(), conRango = rows.filter(r => r.hay);
   const tot = { concreto: 0, bloques: 0, agregados: 0, prefabricados: 0 };
   rows.forEach(r => NEGS.forEach(n => { tot[n] += r.r[n]; }));
   ordenar(rows);
   const zonas = [...new Set(D.proyectos.map(p => p.zona).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
   const asesores = [...new Set(D.asesores.filter(activo).map(a => a.nombre).concat(D.proyectos.map(p => p.asesor).filter(Boolean)))].sort((a, b) => a.localeCompare(b, 'es'));
-  const rangoTxt = F.desde === F.hasta ? fmtMes(F.desde) : fmtMes(F.desde) + ' a ' + fmtMes(F.hasta);
+  const rangoTxt = textoMeses();
   const cnt = {}; filasSinEstado().forEach(p => { const k = estadoK(p.estado); cnt[k] = (cnt[k] || 0) + 1; });
   const titulo = D.esAsesor ? 'Mis proyectos' : 'Proyectos';
   const tenia = document.activeElement && document.activeElement.id === 'proy-q';
@@ -277,6 +300,7 @@ function pintar() {
   RAIZ.innerHTML = `<div class="proy-raiz"><div class="pagina-in">
     <div class="pag-h"><div><h1>${titulo}</h1><p>${D.esAsesor ? 'Registre sus proyectos y lo que van a necesitar mes a mes.' : D.editaTodo ? 'Proyectos de todo el equipo. Puede registrar y cambiar cualquiera.' : 'Proyectos de todo el equipo (solo consulta).'}</p></div>
       ${puedeEditar() ? `<button type="button" class="mv-btn primario" data-accion="nuevo">+ Registrar proyecto</button>` : ''}</div>
+    ${pestanas()}
 
     <section class="filtros mv-card${V.verFiltros ? ' abiertos' : ''}">
       <div class="f-top"><div class="buscar">${IC_BUSCAR}<input type="search" id="proy-q" class="mv-input" placeholder="Buscar cliente, proyecto o asesor" value="${esc(F.q)}" autocomplete="off"></div><button type="button" class="mv-btn ver-filtros" data-accion="ver-filtros" aria-expanded="${!!V.verFiltros}">Filtros${nFiltros() ? ` <em>${nFiltros()}</em>` : ''}</button></div>
@@ -285,8 +309,7 @@ function pintar() {
         <label class="fld"><span>Zona</span><select class="mv-input" data-f="zona"><option value="">Todas</option>${zonas.map(z => `<option${z === F.zona ? ' selected' : ''}>${esc(z)}</option>`).join('')}</select></label>
         <label class="fld"><span>Segmento</span><select class="mv-input" data-f="seg"><option value="">Todos</option>${TIPOS.map(t => `<option value="${t}"${t === F.seg ? ' selected' : ''}>${SEG_CORTO[t]}</option>`).join('')}</select></label>
         <label class="fld"><span>Producto</span><select class="mv-input" data-f="prod">${opcionesProducto()}</select></label>
-        <label class="fld"><span>Desde</span><select class="mv-input" data-f="desde">${opcionesMes(F.desde, sumarMes(R.hoy, -24), sumarMes(R.hoy, 36))}</select></label>
-        <label class="fld"><span>Hasta</span><select class="mv-input" data-f="hasta">${opcionesMes(F.hasta, F.desde, sumarMes(R.hoy, 36))}</select></label>
+        ${selectorMeses()}
       </div>
       <div class="grupo"><div class="sub-h"><span class="sub">Estado</span>${F.estados.size ? '<button type="button" class="todos" data-todos="1">Todos</button>' : ''}</div>
         <div class="pills${F.estados.size ? ' filtrado' : ''}" role="group" aria-label="Estado">${ESTADOS.filter(e => cnt[e.k] || F.estados.has(e.k)).map(e => `<button type="button" class="pill" data-est="${e.k}" aria-pressed="${F.estados.has(e.k)}"><i class="e-${e.k}"></i>${e.n}<small>${cnt[e.k] || 0}</small></button>`).join('')}</div></div>
@@ -320,6 +343,50 @@ function pintar() {
   </div></div>`;
   if (tenia) { const i = $('q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
 }
+/* ---------- Seguimiento del equipo (solo Diego, Jorge y Daniel) ---------- */
+async function cargarSeguimiento(semana) {
+  V.segCargando = true; pintar();
+  try { V.seg = await CTX.api('proyectos.cargarSeguimiento', { semana: semana || (V.seg && V.seg.semana) || '' }); }
+  catch (e) { aviso(e.message || 'No se pudo cargar el seguimiento.', 'error'); }
+  finally { V.segCargando = false; if (vivo()) pintar(); }
+}
+function fechaCorta(f) { if (!f) return ''; const p = f.split('-'); return Number(p[2]) + ' ' + MESES[Number(p[1]) - 1].slice(0, 3); }
+function haceCuanto(f) {
+  if (!f) return 'Nunca';
+  const p = f.split('-').map(Number), d = Math.round((new Date(new Date().toDateString()) - new Date(p[0], p[1] - 1, p[2])) / 864e5);
+  return d <= 0 ? 'Hoy' : d === 1 ? 'Ayer' : d < 7 ? 'Hace ' + d + ' días' : fechaCorta(f);
+}
+function pintarSeguimiento() {
+  const s = V.seg, SEM = { verde: 'Al día', amarillo: 'Entró sin actualizar', rojo: 'No entró' };
+  let cuerpo;
+  if (!s) cuerpo = `<div class="proy-cargando"><span class="mv-giro"></span> Cargando seguimiento…</div>`;
+  else {
+    const c = { verde: 0, amarillo: 0, rojo: 0 }; s.filas.forEach(x => { c[x.semaforo]++; });
+    cuerpo = `
+    <section class="seg-top mv-card">
+      <label class="fld"><span>Semana</span><select class="mv-input" id="proy-seg-sem">${s.semanas.map((w, i) => `<option value="${w}"${w === s.semana ? ' selected' : ''}>${i === 0 ? 'Esta semana' : i === 1 ? 'Semana pasada' : 'Semana del ' + fechaCorta(w)}</option>`).join('')}</select></label>
+      <div class="seg-res"><span class="sem verde"></span>${c.verde} al día <span class="sem amarillo"></span>${c.amarillo} sin actualizar <span class="sem rojo"></span>${c.rojo} no entraron</div>
+      <p class="nota">Del ${fechaCorta(s.semana)} al ${fechaCorta(s.hasta)}${s.enCurso ? ' (en curso)' : ''}. Toque un asesor para ver los proyectos que necesitan atención.</p>
+    </section>
+    <div class="tabla-w"><table class="tabla seg-t">
+      <thead><tr><th>Asesor</th><th>Último ingreso</th><th class="num">Proyectos</th><th class="num">Nuevos</th><th class="num">Actualizados</th><th class="num">Sin ubicar</th><th class="num">Sin tocar +30 días</th></tr></thead>
+      <tbody>${s.filas.map(x => `<tr class="fila${V.segAbierto === x.id ? ' abierta' : ''}">
+          <td data-l="Asesor"><button type="button" class="seg-n" data-seg-abrir="${esc(x.id)}" aria-expanded="${V.segAbierto === x.id}"><span class="sem ${x.semaforo}" title="${SEM[x.semaforo]}"></span>${esc(x.nombre)}</button></td>
+          <td data-l="Último ingreso">${esc(haceCuanto(x.ultimo))}</td>
+          <td data-l="Proyectos" class="num">${x.proyectos}</td><td data-l="Nuevos" class="num">${x.nuevos || ''}</td><td data-l="Actualizados" class="num">${x.actualizados || ''}</td>
+          <td data-l="Sin ubicar" class="num${x.sinUbicar ? ' alerta' : ''}">${x.sinUbicar || ''}</td><td data-l="Sin tocar +30 días" class="num${x.sinTocar ? ' alerta' : ''}">${x.sinTocar || ''}</td></tr>
+          ${V.segAbierto === x.id ? `<tr class="detalle"><td colspan="7">${x.pendientes.length ? `<div class="seg-pend">${x.pendientes.map(p => `<div class="sp"><div><b>${esc(p.proyecto || 'Sin nombre')}</b><small>${esc(p.cliente)} · ${esc(p.id)} · ${esc(p.estado || 'Sin estado')}</small></div><span class="sp-m">${p.motivos.map(esc).join(' · ')}</span>${D.editaTodo ? `<button type="button" class="mv-btn" data-editar="${esc(p.id)}">Editar</button>` : ''}</div>`).join('')}</div>` : '<p class="nota" style="padding:8px 0">Todos sus proyectos están ubicados y al día.</p>'}</td></tr>` : ''}`).join('')}
+      </tbody>
+      <tfoot><tr><th>Equipo</th><th></th><th class="num">${s.equipo.proyectos}</th><th class="num">${s.equipo.nuevos}</th><th class="num">${s.equipo.actualizados}</th><th class="num">${s.equipo.sinUbicar}</th><th class="num">${s.equipo.sinTocar}</th></tr></tfoot>
+    </table></div>
+    <p class="leido"><span class="sem verde"></span> entró y movió sus proyectos en la semana · <span class="sem amarillo"></span> entró pero no actualizó · <span class="sem rojo"></span> no entró. «Último ingreso» puede tardar hasta 6 horas en reflejarse. Cada lunes a las 7 a. m. llega este resumen por correo.</p>`;
+  }
+  RAIZ.innerHTML = `<div class="proy-raiz"><div class="pagina-in">
+    <div class="pag-h"><div><h1>Proyectos</h1><p>Seguimiento del uso de la app por asesor.</p></div>${V.segCargando && s ? '<span class="nota"><span class="mv-giro"></span> Actualizando…</span>' : ''}</div>
+    ${pestanas()}
+    ${cuerpo}
+  </div></div>`;
+}
 /** Proyectos que pasan los demás filtros (para contar por estado sin el propio filtro de estado). */
 function filasSinEstado() { const e = F.estados; F.estados = new Set(); const r = filas().map(x => x.p); F.estados = e; return r; }
 function fila(r) {
@@ -342,7 +409,7 @@ function detalle(p) {
     const ks = mesesDe(l.mes, l.plazo), max = Math.max(1, ...ks.map(k => Number(l.m[k]) || 0));
     return `<div class="dl">
       <div class="dl-h">${icoNeg(l.neg, 18)}<b>${NEG[l.neg].n}${l.cat ? ' · ' + esc(l.cat) : ''}</b><span>${fmt(l.total)} ${NEG[l.neg].u} · ${fmtMes(l.mes)} · ${l.plazo} ${l.plazo === 1 ? 'mes' : 'meses'}</span></div>
-      <div class="barras">${ks.map(k => `<div class="b${k >= F.desde && k <= F.hasta ? ' en' : ''}" title="${fmtMes(k)}: ${fmt(l.m[k] || 0)} ${NEG[l.neg].u}"><i style="height:${Math.max(2, (Number(l.m[k]) || 0) / max * 100)}%"></i><span>${fmtMesCorto(k)}</span></div>`).join('')}</div>
+      <div class="barras">${ks.map(k => `<div class="b${F.meses.has(k) ? ' en' : ''}" title="${fmtMes(k)}: ${fmt(l.m[k] || 0)} ${NEG[l.neg].u}"><i style="height:${Math.max(2, (Number(l.m[k]) || 0) / max * 100)}%"></i><span>${fmtMesCorto(k)}</span></div>`).join('')}</div>
     </div>`;
   }).join('');
   return `<div class="det">
@@ -358,7 +425,7 @@ function detalle(p) {
     </div></div>`;
 }
 function totalesPorMes(rows) {
-  const ks = []; let k = F.desde; while (k <= F.hasta && ks.length < 48) { ks.push(k); k = sumarMes(k, 1); }
+  const ks = mesesSel();
   const t = {}; NEGS.forEach(n => { t[n] = {}; });
   rows.forEach(r => (r.p.lineas || []).filter(lineaEnFiltro).forEach(l => ks.forEach(m => { t[l.neg][m] = (t[l.neg][m] || 0) + (Number(l.m[m]) || 0); })));
   const negs = NEGS.filter(n => ks.some(m => t[n][m]));
@@ -382,7 +449,7 @@ function csvProyectos() {
   csv('proyectos', r);
 }
 function csvLineas() {
-  const ks = []; let k = F.desde; while (k <= F.hasta && ks.length < 48) { ks.push(k); k = sumarMes(k, 1); }
+  const ks = mesesSel();
   const r = [['ID línea', 'ID proyecto', 'Cliente', 'Proyecto', 'Asesor', 'Estado', 'Negocio', 'Categoría / producto', 'Unidad', 'Total', 'Inicio', 'Plazo (meses)', 'En el rango'].concat(ks.map(fmtMes))];
   ordenar(filas()).forEach(x => (x.p.lineas || []).filter(lineaEnFiltro).forEach(l => {
     r.push([l.id || '(sin guardar)', x.p.id, x.p.cliente, x.p.proyecto, x.p.asesor, estadoN(estadoK(x.p.estado)), NEG[l.neg].n, l.cat, NEG[l.neg].u, l.total, l.mes, l.plazo, enRango(l)].concat(ks.map(m => l.m[m] || '')));
@@ -394,6 +461,8 @@ function csvLineas() {
 function eventosLista() {
   RAIZ.addEventListener('click', async ev => {
     if (!D) return;
+    const sm = ev.target.closest('.mes-sel > summary');
+    if (sm) { setTimeout(() => { V.mesAbierto = sm.parentElement.open; }, 0); return; }
     const th = ev.target.closest('th[data-orden]');
     if (th) { const c = th.dataset.orden; V.orden = { col: c, dir: V.orden.col === c ? -V.orden.dir : (c === 'rango' || c === 'act' ? -1 : 1) }; pintar(); return; }
     const b = ev.target.closest('button');
@@ -401,6 +470,18 @@ function eventosLista() {
     if (b) {
       const a = b.dataset.accion;
       if (a === 'nuevo') { abrirFormulario(null); return; }
+      if (b.dataset.mes) { const m = b.dataset.mes; if (F.meses.has(m)) { if (F.meses.size > 1) F.meses.delete(m); } else F.meses.add(m); V.mesAbierto = true; V.max = 150; pintar(); return; }
+      if (b.dataset.mesRap) {
+        const r = b.dataset.mesRap;
+        if (r === 'listo') { V.mesAbierto = false; pintar(); return; }
+        F.meses.clear();
+        if (r === 'hoy') F.meses.add(R.hoy);
+        if (r === 'sig3') for (let i = 0; i < 3; i++) F.meses.add(sumarMes(R.hoy, i));
+        if (r === 'anio') for (let i = 1; i <= 12; i++) F.meses.add(R.hoy.slice(0, 4) + '-' + String(i).padStart(2, '0'));
+        V.mesAbierto = true; V.max = 150; pintar(); return;
+      }
+      if (b.dataset.vista) { V.vista = b.dataset.vista; pintar(); if (V.vista === 'seguimiento' && !V.seg) cargarSeguimiento(); return; }
+      if (b.dataset.segAbrir !== undefined) { V.segAbierto = V.segAbierto === b.dataset.segAbrir ? '' : b.dataset.segAbrir; pintar(); return; }
       if (a === 'mas') { V.max = (V.max || 150) + 150; pintar(); return; }
       if (a === 'tm') { V.tm = !V.tm; pintar(); return; }
       if (a === 'ver-filtros') { V.verFiltros = !V.verFiltros; pintar(); return; }
@@ -438,9 +519,9 @@ function eventosLista() {
     if (tr && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); V.abierto = V.abierto === tr.dataset.abrir ? '' : tr.dataset.abrir; pintar(); }
   });
   RAIZ.addEventListener('change', ev => {
+    if (ev.target.id === 'proy-seg-sem') { cargarSeguimiento(ev.target.value); return; }
     const f = ev.target.dataset.f; if (!f) return;
     F[f] = ev.target.value;
-    if (f === 'desde' && F.hasta < F.desde) F.hasta = F.desde;
     V.max = 150; pintar();
   });
   let tq;
@@ -842,6 +923,7 @@ async function clicFormulario(ev) {
 /* ---------- deep links ---------- */
 function atenderParams(params) {
   // Solo si el pedido está en la dirección actual (el cascarón conserva los params de la última navegación).
+  if (params && D && D.seguimiento && params.vista === 'seguimiento') { V.vista = 'seguimiento'; pintar(); cargarSeguimiento(); history.replaceState(null, '', '#proyectos'); return; }
   if (!params || !D || !/[?&](editar|nuevo)=/.test(location.hash)) return;
   if (params.editar) {
     const p = D.proyectos.find(x => x.id === params.editar);
@@ -857,7 +939,8 @@ MV.registrar('proyectos', {
   async montar(el, ctx) {
     CTX = ctx; RAIZ = el; D = null;
     Object.assign(V, { visible: true, sucio: false, abierto: '', max: 150 });
-    Object.assign(F, { q: '', asesor: '', zona: '', seg: '', prod: '', desde: '', hasta: '' }); F.estados.clear();
+    Object.assign(F, { q: '', asesor: '', zona: '', seg: '', prod: '' }); F.estados.clear(); F.meses.clear();
+    V.vista = 'listado'; V.seg = null; V.segAbierto = ''; V.mesAbierto = false;
     if (FP.el) cerrarFormulario();
     el.innerHTML = '<div class="proy-raiz"><div class="proy-cargando"><span class="mv-giro"></span> Cargando proyectos…</div></div>';
     const d = await ctx.api('proyectos.cargar');
