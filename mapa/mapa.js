@@ -29,6 +29,9 @@ const BASES = [
 const OSCURO = { esri: 'Canvas/World_Dark_Gray_Base', ref: 'Canvas/World_Dark_Gray_Reference', nz: 16, attr: '© Esri, HERE, Garmin, OpenStreetMap' };
 /* Miniaturas: un mosaico de San Pedro Sula (z12). */
 const miniatura = b => b.osm ? OSM + '12/1046/1869.png' : ESRI + b.esri + '/MapServer/tile/12/1869/1046';
+/* Vista inicial según la zona del asesor (pestaña Asesores): Zona Norte → San Pedro Sula; Zona Centro Sur → Tegucigalpa. */
+const CIUDAD_ZONA = { norte: { c: [15.505, -88.025], z: 12 }, centrosur: { c: [14.075, -87.205], z: 12 } };
+function vistaZona(zona) { const z = norm(zona); return z.indexOf('norte') >= 0 ? CIUDAD_ZONA.norte : (z.indexOf('centro') >= 0 || z.indexOf('sur') >= 0) ? CIUDAD_ZONA.centrosur : null; }
 const LIMITES = { todos: [[12.9, -90.2], [16.55, -83.1]], hn: [[12.98, -89.36], [16.52, -83.13]], sv: [[13.14, -90.13], [14.46, -87.68]] };
 const ESTADOS = [
   { k: 'ganado', n: 'Ganado' }, { k: 'perspectiva', n: 'Perspectiva' },
@@ -353,7 +356,7 @@ function dibujarCapasPop() {
   const bk = baseActual().k;
   el.innerHTML = `<p class="sec-t">Tipo de mapa</p>
     <div class="bases">${BASES.map(b => `<button type="button" class="base" data-base="${b.k}" aria-pressed="${b.k === bk}"><i style="background-image:url('${miniatura(b)}')"></i>${b.n}</button>`).join('')}</div>
-    ${oscuro() ? `<p class="nota">En modo oscuro se usa un mapa gris oscuro (salvo satélite).</p>` : ''}`;
+    ${oscuro() ? `<p class="nota">En modo oscuro, «Claro» se muestra en gris oscuro.</p>` : ''}`;
 }
 function dibujarResumen() {
   const vis = filtrar(), o = S.f.sel;
@@ -517,7 +520,8 @@ function capaEsri(ruta, nz, attr, extra) {
   return t;
 }
 function baseActual() {
-  const def = String((S.d && S.d.mapaBase) || 'calles').toLowerCase();
+  /* Sin elección de la persona: en modo oscuro arranca en «Claro» (que se ve gris oscuro); en claro, el del servidor. */
+  const def = oscuro() ? 'claro' : String((S.d && S.d.mapaBase) || 'calles').toLowerCase();
   const k = S.base || (BASES.some(b => b.k === def) ? def : 'calles');
   return BASES.find(b => b.k === k) || BASES[1];
 }
@@ -526,8 +530,8 @@ function ponerBase() {
   if (M.base) M.map.removeLayer(M.base);
   if (M.ref) { M.map.removeLayer(M.ref); M.ref = null; }
   let b = baseActual();
-  /* En modo oscuro, todo menos satélite usa el gris oscuro con etiquetas. */
-  if (oscuro() && b.k !== 'satelite') b = OSCURO;
+  /* En modo oscuro solo «Claro» se cambia por el gris oscuro; Calles, Relieve y Satélite se ven tal cual. */
+  if (oscuro() && b.k === 'claro') b = OSCURO;
   M.map.getContainer().classList.toggle('base-oscura', b === OSCURO);
   if (b.osm) M.base = L.tileLayer(OSM + '{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, attribution: b.attr, referrerPolicy: 'strict-origin-when-cross-origin' });
   else M.base = capaEsri(b.esri, b.nz, b.attr);
@@ -551,7 +555,12 @@ function encuadrarFiltrados() {
 function dibujarTodo() {
   dibujarPanel(); if (!$('capas-pop').hidden) dibujarCapasPop();
   ['proyectos', 'plantas', 'calor', 'geocercas', 'terrenos', 'clientes'].forEach(dibujarCapa);
-  if (!S.vistaInicial) { S.vistaInicial = true; if (S.f.asesor) encuadrarFiltrados(); }
+  if (!S.vistaInicial) {
+    S.vistaInicial = true;
+    const yo = S.d.asesores.find(a => (a.usuario && String(a.usuario).toLowerCase() === CTX.usuario.id) || (S.d.miAsesor && norm(a.nombre) === norm(S.d.miAsesor)));
+    const v = yo && vistaZona(yo.zona);
+    if (v) M.map.setView(v.c, v.z, { animate: false }); else if (S.f.asesor) encuadrarFiltrados();
+  }
   pintarLeyenda();
 }
 function actualizar() { dibujarCapa('proyectos'); if (S.capas.calor) dibujarCapa('calor'); dibujarResumen(); }

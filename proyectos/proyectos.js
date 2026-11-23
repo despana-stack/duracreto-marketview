@@ -649,16 +649,23 @@ function cargarLeaflet() {
   if (window.L) return Promise.resolve();
   return cargandoL || (cargandoL = cargarJs(LEAFLET.js).catch(() => { cargarCss(LEAFLET.altCss); return cargarJs(LEAFLET.alt); }).finally(() => { cargandoL = null; }));
 }
+/** Centro por defecto según la zona: del asesor del proyecto o, si no, del usuario. */
+function ciudadZona(asesor) {
+  const as = (D && D.asesores) || [], yo = CTX.usuario.id;
+  const a = (asesor && as.find(x => norm(x.nombre) === norm(asesor))) || as.find(x => String(x.usuario || '').toLowerCase() === yo) || as.find(x => norm(x.nombre) === norm(miNombre()));
+  const z = norm(a && a.zona);
+  return z.indexOf('centro') >= 0 || z.indexOf('sur') >= 0 ? [14.075, -87.205] : [15.505, -88.025];
+}
 async function iniciarMiniMapa() {
   try { await cargarLeaflet(); } catch (e) { const m = $('fp-mapa'); if (m) m.innerHTML = '<p class="nota" style="padding:12px">No se pudo cargar el mapa. Escriba la dirección; se ubicará sola.</p>'; return; }
   if (!FP.el || FP.el.hidden || !$('fp-mapa')) return;
   if (FP.map) { FP.map.remove(); FP.map = null; FP.marca = null; }
-  const d = FP.d, c = d.lat != null ? [d.lat, d.lng] : [15.5, -88.0];
+  /* Sin punto todavía: arranca en la ciudad de la zona del asesor (Zona Norte → San Pedro Sula; Zona Centro Sur → Tegucigalpa). */
+  const d = FP.d, zc = ciudadZona(d.asesor), c = d.lat != null ? [d.lat, d.lng] : zc;
   const mm = FP.map = L.map('proy-fp-mapa', { zoomControl: true, attributionControl: false }).setView(c, d.lat != null ? 16 : 12);
-  if (CTX.tema() === 'dark') {
-    L.tileLayer(ESRI + 'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 16 }).addTo(mm);
-    L.tileLayer(ESRI + 'Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 16 }).addTo(mm);
-  } else L.tileLayer(OSM + '{z}/{x}/{y}.png', { maxZoom: 20, maxNativeZoom: 19, referrerPolicy: 'strict-origin-when-cross-origin' }).addTo(mm);
+  /* Siempre satélite (con nombres de lugares): es lo más cómodo para marcar el punto, en modo claro u oscuro. */
+  L.tileLayer(ESRI + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(mm);
+  L.tileLayer(ESRI + 'Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19, opacity: .9 }).addTo(mm);
   if (d.lat != null) ponerMarca([d.lat, d.lng], false);
   mm.on('click', ev => ponerMarca([ev.latlng.lat, ev.latlng.lng], true));
   setTimeout(() => mm.invalidateSize(), 120);
