@@ -455,6 +455,8 @@ function flotantes() {
   FP.scrim.addEventListener('click', () => cerrarFormulario());
   FP.el.addEventListener('click', clicFormulario);
   FP.el.addEventListener('change', cambioFormulario);
+  /* Pegar un enlace de Google Maps o unas coordenadas en «¿Dónde queda?» ubica el punto solo. */
+  FP.el.addEventListener('paste', ev => { if (ev.target.id === 'proy-fp-ref') setTimeout(() => { const t = ev.target.value.trim(); if (pareceUbicacion(t)) ubicarDesdeTexto(t); }, 0); });
 }
 document.addEventListener('keydown', ev => {
   if (ev.key !== 'Escape' || !FP.el || FP.el.hidden) return;
@@ -538,7 +540,7 @@ function pintarFormulario() {
       <div class="tipos">${TIPOS.map(k => `<button type="button" class="tipo" data-fp-tipo="${k}" aria-pressed="${d.tipo === k}">${icoSeg(k, 28)}${SEG_CORTO[k]}</button>`).join('')}</div>
     </div>
     <div class="fp-sec"><span class="lbl"><em>2</em>¿Dónde queda?</span>
-      <div class="fila-b"><input type="text" class="mv-input" id="proy-fp-ref" value="${esc(d.ref)}" placeholder="Dirección o referencia (colonia, barrio, ciudad)"><button type="button" class="mv-btn" data-fp="buscar">Buscar</button></div>
+      <div class="fila-b"><input type="text" class="mv-input" id="proy-fp-ref" value="${esc(d.ref)}" placeholder="Dirección, referencia o enlace de Google Maps"><button type="button" class="mv-btn" data-fp="buscar">Buscar</button></div>
       <div id="proy-fp-lugares"></div>
       <div id="proy-fp-mapa"></div>
       <div class="fila-b" style="justify-content:space-between;align-items:center"><span class="nota" id="proy-fp-punto">${d.lat != null ? 'Punto marcado. Puede arrastrarlo para afinarlo.' : 'Toque el mapa para marcar el punto (opcional si escribe la dirección).'}</span><button type="button" class="btn ghost" data-fp="gps">Usar mi ubicación</button></div>
@@ -649,6 +651,42 @@ function cargarLeaflet() {
   if (window.L) return Promise.resolve();
   return cargandoL || (cargandoL = cargarJs(LEAFLET.js).catch(() => { cargarCss(LEAFLET.altCss); return cargarJs(LEAFLET.alt); }).finally(() => { cargandoL = null; }));
 }
+/* ---------- Enlaces de Google Maps y coordenadas pegadas ----------
+   Acepta: enlaces largos (…/@15.50,-88.02,17z, …!3d15.50!4d-88.02, ?q=15.50,-88.02), enlaces cortos
+   (maps.app.goo.gl/…, goo.gl/maps/…: los abre el servidor para ver a dónde llevan), «15.50, -88.02» y
+   «15°28'01.7"N 87°59'43.9"W». Solo se aceptan puntos dentro de Honduras o El Salvador. */
+const CAJA_HN_SV = { s: 12.9, n: 16.6, w: -90.2, e: -83.1 };
+const enCaja = (la, ln) => la >= CAJA_HN_SV.s && la <= CAJA_HN_SV.n && ln >= CAJA_HN_SV.w && ln <= CAJA_HN_SV.e;
+const esEnlaceCorto = t => /(maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/kgs)\//i.test(t);
+function pareceUbicacion(t) { return /google\.[a-z.]+\/maps|maps\.google\.|maps\.app\.goo\.gl|goo\.gl\/maps/i.test(t) || !!coordsDeTexto(t); }
+function coordsDeTexto(t) {
+  t = String(t || '');
+  const ok = (la, ln) => { la = Number(la); ln = Number(ln); if (!isFinite(la) || !isFinite(ln)) return null; if (ln > 0 && enCaja(la, -ln)) ln = -ln; return enCaja(la, ln) ? [la, ln] : null; };
+  let m = t.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);           // punto exacto del lugar
+  if (m) return ok(m[1], m[2]);
+  m = t.match(/[?&](?:q|query|ll|destination|daddr)=(-?\d+(?:\.\d+)?)(?:,|%2C)\s*(-?\d+(?:\.\d+)?)/i);
+  if (m) return ok(m[1], m[2]);
+  m = t.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);                   // centro de la vista
+  if (m) return ok(m[1], m[2]);
+  m = t.match(/(\d{1,2})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([NS])[\s,]+(\d{1,3})\s*°\s*(\d{1,2})\s*['′]\s*(\d{1,2}(?:\.\d+)?)\s*["″]?\s*([EOW])/i);
+  if (m) { const g = (d, mi, s, h) => (Number(d) + Number(mi) / 60 + Number(s) / 3600) * (/[SWO]/i.test(h) ? -1 : 1); return ok(g(m[1], m[2], m[3], m[4]), g(m[5], m[6], m[7], m[8])); }
+  m = t.match(/^\s*(-?\d{1,2}\.\d{3,})\s*[,;\s]\s*(-?\d{1,3}\.\d{3,})\s*$/);    // «15.5012, -88.0251»
+  if (m) return ok(m[1], m[2]);
+  return null;
+}
+async function ubicarDesdeTexto(t, boton) {
+  let ll = coordsDeTexto(t);
+  if (!ll && esEnlaceCorto(t)) {
+    if (boton) { boton.disabled = true; boton.textContent = 'Abriendo enlace…'; }
+    try { const r = await CTX.api('proyectos.lugarDeEnlace', { url: t.match(/https?:\/\/\S+/i) ? t.match(/https?:\/\/\S+/i)[0] : t }); if (r && r.lat != null) ll = [r.lat, r.lng]; }
+    catch (e) { console.error(e); }
+    finally { if (boton) { boton.disabled = false; boton.textContent = 'Buscar'; } }
+  }
+  if (!ll) { aviso('No se pudo leer la ubicación de ese enlace. En Google Maps use «Compartir › Copiar vínculo», o marque el punto en el mapa.', 'error'); return; }
+  const lug = $('fp-lugares'); if (lug) lug.innerHTML = '';
+  ponerMarca(ll, true); if (FP.map) FP.map.setView(ll, 17);
+  aviso('Ubicación tomada del enlace. Revise el punto y arrástrelo si hace falta.');
+}
 /** Centro por defecto según la zona: del asesor del proyecto o, si no, del usuario. */
 function ciudadZona(asesor) {
   const as = (D && D.asesores) || [], yo = CTX.usuario.id;
@@ -712,6 +750,7 @@ async function clicFormulario(ev) {
   if (a === 'cerrar') { cerrarFormulario(); return; }
   if (a === 'buscar') {
     const t = $('fp-ref').value.trim(); if (t.length < 3) { aviso('Escriba al menos 3 letras de la dirección.'); return; }
+    if (pareceUbicacion(t)) { ubicarDesdeTexto(t, b); return; }
     b.disabled = true; b.textContent = 'Buscando…';
     try {
       FP.lugares = (await CTX.api('proyectos.buscarLugar', { texto: t })) || [];
