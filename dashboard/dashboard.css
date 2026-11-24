@@ -248,3 +248,7 @@
   .dash-esq span,.dash-esq-alto::after,.dash-act.girando svg{animation:none}
   .dash-notas summary::before{transition:none}
 }
+
+/* Enlace al proyecto en MarketView */
+.dash-abrir{display:inline-flex;align-items:center;gap:3px;margin-top:3px;padding:0;border:0;background:none;color:var(--accent-ink);font-size:11.5px;font-weight:600;text-decoration:underline;text-underline-offset:2px;cursor:pointer;flex-basis:100%;justify-content:flex-start}
+.dash-abrir:hover{color:var(--fg)}

@@ -314,13 +314,15 @@
       corte = `<span class="dash-corte aviso" title="${esc(fechas)}">${IC.alerta}<span>Datos de IT sin actualizar desde hace ${atraso} días <small>(${esc(fechas.replace('Facturado', 'facturado').replace('Perspectivas', 'perspectivas'))})</small></span></span>`;
     else
       corte = `<span class="dash-corte" title="Leído ${esc(f.leido || '')} (${esc(f.origen || '')})">${IC.reloj}${esc(fechas)}</span>`;
+    const lectura = f.origen !== 'respaldo' && f.aviso   // no se pudo leer el Forecast o el cuadro: se muestran los valores de IT
+      ? `<span class="dash-corte aviso" title="${esc(f.aviso)}">${IC.alerta}Metas o perspectivas con datos de IT: no se pudo leer un archivo</span>` : '';
     const puede = C.rol === 'editor' && !(C.usuario && C.usuario.soloLectura);
     const unid = est.vista === 'V' ? `<div class="dash-unids" role="group" aria-label="Unidad de negocio">${unidadesVol().map(u =>
       `<button type="button" class="dash-chip" data-acc="unidad" data-v="${esc(u.nombre)}" aria-pressed="${u.nombre === est.unidad}">${esc(u.nombre)} <small>${esc(u.um)}</small></button>`).join('')}</div>` : '';
     return `<div class="dash-barra">
       ${seg('periodo', ps.map(p => ({ v: p.clave, n: CORTO[p.clave] || p.nombre, t: p.nombre })), est.periodo)}
       ${unidadesVol().length ? seg('vista', [{ v: 'L', n: 'Lempiras' }, { v: 'V', n: 'Volumen' }], est.vista) : ''}
-      ${corte}
+      ${corte}${lectura}
       ${puede ? `<button type="button" class="mv-btn dash-act" data-acc="actualizar" title="Volver a leer la plantilla de IT ahora">${IC.actualizar}<span>Actualizar</span></button>` : ''}
     </div>${unid}`;
   }
@@ -334,7 +336,7 @@
     const barraAv = num(t.cumpl_facturado) ? `<div class="dash-av ${c}" aria-hidden="true"><i style="width:${Math.min(100, t.cumpl_facturado * 100)}%"></i>${num(t.avance) ? `<em style="left:${Math.min(100, t.avance * 100)}%" title="Ritmo esperado"></em>` : ''}</div>` : '';
     return `<section class="dash-kpis" aria-label="Indicadores">
       ${kpi('Cumplimiento' + um, fmtPct(t.cumpl_facturado), num(t.avance) ? 'Ritmo esperado al corte: ' + fmtPct(t.avance) : 'Facturado ÷ meta forecast', chipEstatus(t, t.avance) + barraAv, 'dash-kpi-cumpl ' + c)}
-      ${kpi('Meta forecast', fmtV(t.meta), est.vista === 'V' ? 'Cantidad del forecast oficial' : 'Forecast oficial de Presidencia')}
+      ${kpi('Meta forecast', fmtV(t.meta), est.vista === 'V' ? 'Cantidad del Forecast Comercial' : 'Forecast Comercial Nov–Dic 2026')}
       ${kpi('Facturado real', sinFact ? '—' : fmtV(t.facturado), sinFact ? 'Sin facturación todavía' : (num(t.documentos) ? nf(t.documentos) + ' documentos' : 'Reporte de ventas SAP'))}
       ${kpi('Perspectivas ganadas', fmtV(t.ganado), (num(t.n_ganado) ? nf(t.n_ganado) + ' ganados' : 'Ganados') + (num(t.perspectiva) && t.perspectiva ? ' · ' + fmtV(t.perspectiva) + ' en negociación' : ''))}
       ${kpi('Proyección de cierre', fmtV(t.proyeccion), num(t.cumpl_proyeccion) ? fmtPct(t.cumpl_proyeccion) + ' de la meta' : 'Facturado + perspectivas')}
@@ -495,15 +497,20 @@
       (!q || [p.cliente, p.proyecto, p.producto, p.asesor, p.planta, p.competidor].join(' ').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').indexOf(q) >= 0)
     ).sort((a, b) => (montoPer(b) || 0) - (montoPer(a) || 0) || (volPer(b) || 0) - (volPer(a) || 0));
   }
+  /** «PRY-0001 ↗»: abre el proyecto en el módulo Proyectos de MarketView (solo si el usuario tiene ese módulo). */
+  function enlaceProyecto(p) {
+    if (!p.id || !C || !C.usuario || !C.usuario.roles || !C.usuario.roles.proyectos) return '';
+    return `<button type="button" class="dash-abrir" data-acc="proyecto" data-v="${esc(p.id)}" title="Abrir ${esc(p.id)} en Proyectos de MarketView">${esc(p.id)} <span aria-hidden="true">↗</span><span class="dash-sr"> abrir en Proyectos</span></button>`;
+  }
   function filaProyecto(p) {
     const al = (p.alertas || []).length ? `<span class="dash-alerta" title="${esc(p.alertas.join(' · '))}">${IC.alerta}<span class="dash-sr">${esc(p.alertas.join(', '))}</span></span>` : '';
     return `<div class="dash-pr" role="row">
-      <div class="dash-pr-p" role="cell"><b>${esc(p.proyecto || '—')}</b>${al}<small>${esc(p.cliente || '')}</small></div>
+      <div class="dash-pr-p" role="cell"><b>${esc(p.proyecto || '—')}</b>${al}<small>${esc(p.cliente || '')}</small>${enlaceProyecto(p)}</div>
       <div class="dash-pr-a" role="cell">${esc(p.asesor || '—')}<small>${esc(p.zona || '')}</small></div>
       <div class="dash-pr-u" role="cell">${esc(p.unidad || '—')}<small>${esc(p.producto || '')}${p.planta ? ' · ' + esc(p.planta) : ''}</small></div>
       <div class="dash-pr-e" role="cell"><span class="dash-badge ${claseEstado(p.estado)}">${esc(etiquetaEstado(p.estado))}</span>${p.competidor ? `<small>${esc(p.competidor)}</small>` : ''}</div>
       <div class="dash-pr-v" role="cell"><span class="dash-et">Volumen</span>${fmtN(volPer(p), p.um)}</div>
-      <div class="dash-pr-r" role="cell"><span class="dash-et">Precio</span>${num(p.precio) ? fmtLc(p.precio) : '—'}</div>
+      <div class="dash-pr-r" role="cell"><span class="dash-et">Precio</span><span title="${esc(p.fuente_precio ? 'Precio usado: ' + p.fuente_precio + (num(p.precio) && p.fuente_precio !== 'capturado' ? ' · el asesor capturó L ' + nf(p.precio, p.precio % 1 ? 2 : 0) : '') : '')}">${num(p.precio_usado) ? fmtLc(p.precio_usado) : (num(p.precio) ? fmtLc(p.precio) : '—')}</span></div>
       <div class="dash-pr-m" role="cell"><span class="dash-et">Monto</span><b>${fmtLc(montoPer(p))}</b></div>
       ${p.obs ? `<div class="dash-pr-o" role="cell">${esc(p.obs)}</div>` : ''}
     </div>`;
@@ -592,6 +599,7 @@
     else if (acc === 'estado') { est.estado = est.estado === v ? '' : v; est.pagina = 0; sincronizarFiltros(); pintarProyectos(); }
     else if (acc === 'pag') { est.pagina = Math.max(0, est.pagina + Number(v)); pintarProyectos(); const s = raiz.querySelector('.dash-proy'); s && s.scrollIntoView({ block: 'start', behavior: mqMov.matches ? 'auto' : 'smooth' }); }
     else if (acc === 'asesor') abrirAsesor(v);
+    else if (acc === 'proyecto') { cerrarPanel(); C.abrir('proyectos', { editar: v }); }   // el módulo Proyectos abre el proyecto con «editar»
     else if (acc === 'cerrar') cerrarPanel();
     else if (acc === 'notas') { const n = raiz.querySelector('.dash-notas'); if (n) { n.open = true; n.scrollIntoView({ block: 'start', behavior: mqMov.matches ? 'auto' : 'smooth' }); } }
   }
