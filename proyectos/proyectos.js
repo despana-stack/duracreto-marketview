@@ -169,8 +169,10 @@ const F = { q: '', asesor: '', zona: '', seg: '', prod: '', estados: new Set(), 
 const FP = { p: null, d: null, map: null, marca: null, lugares: [], el: null, scrim: null, dlg: null };
 const vivo = () => !!(RAIZ && RAIZ.isConnected);
 const miNombre = () => (D && (D.miNombre || D.miAsesor)) || (CTX && CTX.usuario.nombre) || '';
-/* Quién puede cambiar: el editor todo; el asesor lo suyo (el servidor ya le manda solo lo suyo). El visualizador nunca. */
-const puedeEditar = () => !!(D && D.registrar && (D.editaTodo || D.esAsesor));
+/* Quién puede cambiar: el editor todo; el asesor lo suyo (el servidor ya le manda solo lo suyo);
+   Oficina (Daniel, Pamela) solo los proyectos de «Oficina». El visualizador nunca. El servidor lo vuelve a revisar. */
+const esDeOficina = p => !!(p && D && norm(p.asesor) === norm(D.nombreOficina || 'Oficina'));
+const puedeEditar = p => !!(D && D.registrar && (D.editaTodo || D.esAsesor || (D.oficina && (!p || esDeOficina(p)))));
 const verMapa = () => !!(CTX && CTX.usuario.roles && CTX.usuario.roles.mapa);
 const catalogo = () => (D && D.catalogo) || [];
 const prodNombre = id => { const p = catalogo().find(x => x.id === id); return p ? p.nombre + (p.esp ? ' (' + p.esp + ')' : '') : ''; };
@@ -298,7 +300,7 @@ function pintar() {
   const tenia = document.activeElement && document.activeElement.id === 'proy-q';
   const th = (c, t, cls) => `<th class="${cls || ''}" data-orden="${c}" aria-sort="${V.orden.col === c ? (V.orden.dir < 0 ? 'descending' : 'ascending') : 'none'}"><button type="button">${t}${V.orden.col === c ? (V.orden.dir < 0 ? ' ↓' : ' ↑') : ''}</button></th>`;
   RAIZ.innerHTML = `<div class="proy-raiz"><div class="pagina-in">
-    <div class="pag-h"><div><h1>${titulo}</h1><p>${D.esAsesor ? 'Registre sus proyectos y lo que van a necesitar mes a mes.' : D.editaTodo ? 'Proyectos de todo el equipo. Puede registrar y cambiar cualquiera.' : 'Proyectos de todo el equipo (solo consulta).'}</p></div>
+    <div class="pag-h"><div><h1>${titulo}</h1><p>${D.esAsesor ? 'Registre sus proyectos y lo que van a necesitar mes a mes.' : D.editaTodo ? 'Proyectos de todo el equipo. Puede registrar y cambiar cualquiera.' : D.oficina ? 'Proyectos de todo el equipo. Puede registrar y cambiar los de Oficina (intercompany); los demás, solo consulta.' : 'Proyectos de todo el equipo (solo consulta).'}</p></div>
       ${puedeEditar() ? `<button type="button" class="mv-btn primario" data-accion="nuevo">+ Registrar proyecto</button>` : ''}</div>
     ${pestanas()}
 
@@ -404,7 +406,7 @@ function fila(r) {
     </tr>${abierto ? `<tr class="detalle"><td colspan="8">${detalle(p)}</td></tr>` : ''}`;
 }
 function detalle(p) {
-  const ek = estadoK(p.estado), ed = puedeEditar();
+  const ek = estadoK(p.estado), ed = puedeEditar(p);
   const lineas = (p.lineas || []).map(l => {
     const ks = mesesDe(l.mes, l.plazo), max = Math.max(1, ...ks.map(k => Number(l.m[k]) || 0));
     return `<div class="dl">
@@ -600,7 +602,7 @@ function pedirMotivoBaja(pr) {
   });
 }
 async function eliminarProyecto(pr, desdeFormulario) {
-  if (!pr || !puedeEditar()) return;
+  if (!pr || !puedeEditar(pr)) return;
   const r0 = await pedirMotivoBaja(pr); if (!r0) return;
   try {
     const r = await CTX.api('proyectos.eliminar', { id: pr.id, motivo: r0.motivo, nota: r0.nota });
@@ -630,13 +632,13 @@ function nuevaLinea(neg, base) {
   return { id: '', neg, cat: '', prod: '', total: '', mes: ref.mes || sumarMes(R.hoy, 1), plazo: ref.plazo || 3, m: {}, fij: new Set() };
 }
 function abrirFormulario(p) {
-  if (!puedeEditar()) { aviso('Su usuario puede ver los proyectos, pero no cambiarlos.', 'error'); return; }
+  if (!puedeEditar(p)) { aviso(p ? 'Este proyecto no es de Oficina: puede verlo, pero no cambiarlo.' : 'Su usuario puede ver los proyectos, pero no cambiarlos.', 'error'); return; }
   flotantes();
   FP.p = p; FP.lugares = [];
   FP.d = p ? { id: p.id, cliente: p.cliente || '', proyecto: p.proyecto || '', tipo: segK(p), ref: p.ref || '', lat: p.lat, lng: p.lng,
       estado: estadoN(estadoK(p.estado)), comp: p.comp || '', notas: p.notas || '', asesor: p.asesor || '',
       lineas: (p.lineas || []).map(l => ({ id: l.id || '', neg: l.neg, cat: l.cat || '', prod: l.prod || '', total: l.total, mes: l.mes, plazo: l.plazo, m: Object.assign({}, l.m), fij: new Set(l.fij || []) })) }
-    : { cliente: '', proyecto: '', tipo: '', ref: '', lat: null, lng: null, estado: 'Perspectiva', comp: '', notas: '', asesor: D.editaTodo ? (D.miAsesor || '') : miNombre(), lineas: [nuevaLinea('concreto')] };
+    : { cliente: '', proyecto: '', tipo: '', ref: '', lat: null, lng: null, estado: 'Perspectiva', comp: '', notas: '', asesor: D.editaTodo ? (D.miAsesor || '') : D.oficina ? (D.nombreOficina || 'Oficina') : miNombre(), lineas: [nuevaLinea('concreto')] };
   if (FP.d.estado === 'Sin estado') FP.d.estado = 'Perspectiva';
   if (!FP.d.lineas.length) FP.d.lineas.push(nuevaLinea('concreto'));
   pintarFormulario();
@@ -652,12 +654,14 @@ function cerrarFormulario() {
 }
 function pintarFormulario() {
   const d = FP.d;
-  const clientes = [...new Set(D.proyectos.map(p => String(p.cliente || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es')).slice(0, 800);
-  const asesores = [...new Set(D.asesores.filter(activo).map(a => a.nombre))].sort((a, b) => a.localeCompare(b, 'es'));
+  // Proyectos de Oficina: primero los clientes intercompany sugeridos (se puede escribir otro).
+  const deOficina = D.oficina || esDeOficina(d);
+  const clientes = [...new Set((deOficina ? (D.clientesOficina || []) : []).concat(D.proyectos.map(p => String(p.cliente || '').trim()).filter(Boolean).sort((a, b) => a.localeCompare(b, 'es'))))].slice(0, 800);
+  const asesores = [...new Set(D.asesores.filter(activo).map(a => a.nombre).concat([D.nombreOficina || 'Oficina']))].sort((a, b) => a.localeCompare(b, 'es'));
   const estados = ['Perspectiva', 'Ganado', 'Competencia', 'Perdido'];
   FP.el.innerHTML = `<div class="drawer-h"><h2>${FP.p ? 'Actualizar proyecto' : 'Registrar proyecto'}</h2><button type="button" class="btn ghost" data-fp="cerrar" aria-label="Cerrar">✕</button></div>
     <div class="fp-sec"><span class="lbl"><em>1</em>Proyecto</span>
-      <div class="fld"><label for="proy-fp-cliente">Cliente</label><input type="text" class="mv-input" id="proy-fp-cliente" list="proy-fp-clientes" value="${esc(d.cliente)}" placeholder="Empresa o persona" autocomplete="off"><datalist id="proy-fp-clientes">${clientes.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+      <div class="fld"><label for="proy-fp-cliente">Cliente</label><input type="text" class="mv-input" id="proy-fp-cliente" list="proy-fp-clientes" value="${esc(d.cliente)}" placeholder="${deOficina ? 'Elija o escriba la empresa' : 'Empresa o persona'}" autocomplete="off"><datalist id="proy-fp-clientes">${clientes.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
       <div class="fld"><label for="proy-fp-proyecto">Nombre del proyecto</label><input type="text" class="mv-input" id="proy-fp-proyecto" value="${esc(d.proyecto)}" placeholder="Ej. Torre Los Álamos, bodega en Choloma"></div>
       <span class="lbl2">Tipo de proyecto</span>
       <div class="tipos">${TIPOS.map(k => `<button type="button" class="tipo" data-fp-tipo="${k}" aria-pressed="${d.tipo === k}">${icoSeg(k, 28)}${SEG_CORTO[k]}</button>`).join('')}</div>
@@ -673,6 +677,7 @@ function pintarFormulario() {
       <div class="fld" id="proy-fp-comp-w" ${d.estado === 'Competencia' ? '' : 'hidden'}><label for="proy-fp-comp">¿Con qué competidor?</label><select class="mv-input" id="proy-fp-comp"><option value="">Elija el competidor</option>${(D.competidores || []).map(c => `<option${norm(c) === norm(d.comp) ? ' selected' : ''}>${esc(c)}</option>`).join('')}${d.comp && !(D.competidores || []).some(c => norm(c) === norm(d.comp)) ? `<option selected>${esc(d.comp)}</option>` : ''}<option value="__otro">Otro (escribir)</option></select><input type="text" class="mv-input" id="proy-fp-comp-otro" placeholder="Nombre del competidor" hidden></div>
       ${D.editaTodo ? `<div class="fld"><label for="proy-fp-asesor">Asesor</label><select class="mv-input" id="proy-fp-asesor"><option value="">Sin asesor asignado</option>${asesores.map(a => `<option${norm(a) === norm(d.asesor) ? ' selected' : ''}>${esc(a)}</option>`).join('')}${d.asesor && !asesores.some(a => norm(a) === norm(d.asesor)) ? `<option selected>${esc(d.asesor)}</option>` : ''}</select></div>` : ''}
     </div>
+    ${D.oficina && !D.editaTodo ? `<p class="nota" style="margin:-4px 0 0">Se registra como proyecto de <b>Oficina</b> (sin asesor).</p>` : ''}
     <div class="fp-sec"><span class="lbl"><em>4</em>Productos</span>
       <div id="proy-lineas"></div>
       <div class="agregar"><span class="nota">+ Agregar producto:</span>${ORDEN_AGREGAR.map(n => `<button type="button" class="pill" data-agregar="${n}">${icoNeg(n, 16)}${NEG[n].n}</button>`).join('')}</div>
